@@ -106,10 +106,6 @@ fn cmd_init() -> ExitCode {
         return code;
     }
 
-    // .read(true) so exclusions_exists can check the current content,
-    // .append(true) so any write always lands at the end regardless of
-    // where the read cursor ended up, .create(true) so this same call
-    // handles both "already exists" and "doesn't exist yet".
     let mut gitignore = match OpenOptions::new()
         .read(true)
         .append(true)
