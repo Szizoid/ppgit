@@ -1,0 +1,12 @@
+[package]
+name = "ppgit"
+version = "0.1.0"
+edition = "2024"
+authors = ["Szizoid <e.ivan5@ya.ru>"]
+description = "CLI wrapper over git for keeping a public and a private (superset) repository of the same project in sync"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/Szizoid/ppgit"
+keywords = ["git", "cli", "public-private", "dotfiles"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
