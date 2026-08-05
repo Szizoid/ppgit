@@ -15,26 +15,28 @@ routine of keeping them in sync.
 
 ### Status
 
-The project is at a very early stage — the public/private split logic isn't
-implemented yet. Right now `ppgit` is a transparent passthrough wrapper over
-`git`:
+The project is at an early stage. `ppgit` is a transparent passthrough
+wrapper over `git`, plus a handful of its own commands:
 
 - `ppgit <command>` forwards everything as-is to `git <command>` (arguments
   are passed through via `args_os`, so non-UTF-8 paths aren't mangled), and
   the real exit code is propagated back, including the case where `git` gets
   killed by a signal (on Unix).
-- `ppgit`/`ppgit -V`/`ppgit --version` print ppgit's own version, `ppgit -h`
-  /`--help`/a bare `ppgit` print ppgit's own short help — everything else
-  still goes straight to `git`.
-- A `pp` alias binary is built alongside `ppgit` (same binary, installed
-  under a second name — see `src/bin/pp.rs`).
+- `ppgit -V`/`--version` and `ppgit -h`/`--help`/a bare `ppgit` print ppgit's
+  own version/short help — everything else still goes straight to `git`.
+- `ppgit init` sets up the local half of the public/private split: creates
+  `.git` (the public, completely standard repository) if it's missing, a
+  `.ppgitignore` template (left alone if it already exists), a bare `.ppgit`
+  git-dir (the private, superset repository), and idempotently adds
+  `.ppgit`/`.ppgitignore` to `.gitignore`. Safe to run more than once.
+- A `pp` alias binary is built alongside `ppgit`.
 
 ### Plans (not finalized)
 
-- `.ppgitignore` — a list of paths that should only go into the private
-  repository.
-- A dedicated state directory `.ppgit/`.
-- Commands to set up and sync both remotes.
+- Actually reading `.ppgitignore` to route commands between the public and
+  private repositories.
+- Commands to set up and sync both GitHub remotes (`repo-name` public,
+  `pp-repo-name` private).
 
 ### Installation
 
@@ -64,25 +66,30 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
 
 ### Статус
 
-Проект в самой ранней стадии — логика разделения на публичное/приватное ещё
-не реализована. Пока `ppgit` — прозрачная обёртка над `git`:
+Проект в ранней стадии. `ppgit` — прозрачная обёртка над `git`, плюс
+несколько собственных команд:
 
 - `ppgit <command>` пробрасывает всё как есть в `git <command>` (аргументы
-  передаются через `args_os`, так что пути в не-UTF-8 не портятся), а
-  наружу возвращается настоящий код завершения git, включая случай, когда
-  git убит сигналом (на Unix).
-- `ppgit -V`/`--version` и голый `ppgit`/`-h`/`--help` показывают
-  собственную версию/справку ppgit — всё остальное по-прежнему уходит в
-  `git`.
-- Рядом с `ppgit` собирается алиас `pp` (тот же код, второй бинарник — см.
-  `src/bin/pp.rs`).
+  передаются через `args_os`, так что пути в не-UTF-8 не портятся), а наружу
+  возвращается настоящий код завершения git, включая случай, когда git убит
+  сигналом (на Unix).
+- `ppgit -V`/`--version` и `ppgit -h`/`--help`/голый `ppgit` показывают
+  собственную версию/краткую справку ppgit — всё остальное по-прежнему
+  уходит в `git`.
+- `ppgit init` настраивает локальную половину разделения на
+  публичное/приватное: создаёт `.git` (публичный, полностью обычный
+  репозиторий), если его ещё нет, шаблон `.ppgitignore` (не трогается, если
+  уже существует), bare-репозиторий `.ppgit` (приватный, суперсет), и
+  идемпотентно добавляет `.ppgit`/`.ppgitignore` в `.gitignore`. Безопасно
+  запускать повторно.
+- Рядом с `ppgit` собирается алиас `pp`.
 
 ### Планы (не финализировано)
 
-- `.ppgitignore` — список путей, которые должны попадать только в приватный
-  репозиторий.
-- Собственная директория состояния `.ppgit/`.
-- Команды для настройки и синхронизации обоих remote'ов.
+- Реально читать `.ppgitignore`, чтобы маршрутизировать команды между
+  публичным и приватным репозиториями.
+- Команды для настройки и синхронизации обоих GitHub-remote'ов
+  (`repo-name` публичный, `pp-repo-name` приватный).
 
 ### Установка
 

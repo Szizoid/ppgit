@@ -1,7 +1,7 @@
-use std::process::exit;
+use std::process::ExitCode;
 
 use ppgit::run;
 
-fn main() {
-    exit(run());
+fn main() -> ExitCode {
+    run()
 }
