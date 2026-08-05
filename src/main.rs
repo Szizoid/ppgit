@@ -1,3 +1,7 @@
+use std::process::exit;
+
+use ppgit::run;
+
 fn main() {
-    println!("Hello, world!");
+    exit(run());
 }
