@@ -24,19 +24,25 @@ wrapper over `git`, plus a handful of its own commands:
   killed by a signal (on Unix).
 - `ppgit -V`/`--version` and `ppgit -h`/`--help`/a bare `ppgit` print ppgit's
   own version/short help — everything else still goes straight to `git`.
-- `ppgit init` sets up the local half of the public/private split: creates
-  `.git` (the public, completely standard repository) if it's missing, a
-  `.ppgitignore` template (left alone if it already exists), a bare `.ppgit`
-  git-dir (the private, superset repository), and idempotently adds
-  `.ppgit`/`.ppgitignore` to `.gitignore`. Safe to run more than once.
+- `ppgit init` sets up both halves of the public/private split:
+  - locally — creates `.git` (the public, completely standard repository) if
+    it's missing, a `.ppgitignore` template (left alone if it already
+    exists), a bare `.ppgit` git-dir (the private, superset repository), and
+    idempotently adds `.ppgit`/`.ppgitignore` to `.gitignore`;
+  - on GitHub (via `gh`, after checking it's installed and logged in) —
+    creates the public (`<dir-name>`) and private (`pp-<dir-name>`)
+    repositories if they don't already exist, and points `origin` in each
+    git-dir at the right one.
+
+  Every step is safe to run more than once — nothing gets recreated or
+  duplicated on a second `ppgit init`.
 - A `pp` alias binary is built alongside `ppgit`.
 
 ### Plans (not finalized)
 
-- Actually reading `.ppgitignore` to route commands between the public and
-  private repositories.
-- Commands to set up and sync both GitHub remotes (`repo-name` public,
-  `pp-repo-name` private).
+- Actually reading `.ppgitignore` to route regular commands (`add`,
+  `commit`, `status`, `push`, `pull`, ...) between the public and private
+  repositories.
 
 ### Installation
 
@@ -76,20 +82,25 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
 - `ppgit -V`/`--version` и `ppgit -h`/`--help`/голый `ppgit` показывают
   собственную версию/краткую справку ppgit — всё остальное по-прежнему
   уходит в `git`.
-- `ppgit init` настраивает локальную половину разделения на
-  публичное/приватное: создаёт `.git` (публичный, полностью обычный
-  репозиторий), если его ещё нет, шаблон `.ppgitignore` (не трогается, если
-  уже существует), bare-репозиторий `.ppgit` (приватный, суперсет), и
-  идемпотентно добавляет `.ppgit`/`.ppgitignore` в `.gitignore`. Безопасно
-  запускать повторно.
+- `ppgit init` настраивает обе половины разделения на публичное/приватное:
+  - локально — создаёт `.git` (публичный, полностью обычный репозиторий),
+    если его ещё нет, шаблон `.ppgitignore` (не трогается, если уже
+    существует), bare-репозиторий `.ppgit` (приватный, суперсет), и
+    идемпотентно добавляет `.ppgit`/`.ppgitignore` в `.gitignore`;
+  - на GitHub (через `gh`, предварительно проверив, что он установлен и
+    залогинен) — создаёт публичный (`<имя-директории>`) и приватный
+    (`pp-<имя-директории>`) репозитории, если их ещё нет, и прописывает
+    `origin` в каждом git-dir на соответствующий.
+
+  Каждый шаг безопасно запускать повторно — при втором `ppgit init` ничего
+  не пересоздаётся и не дублируется.
 - Рядом с `ppgit` собирается алиас `pp`.
 
 ### Планы (не финализировано)
 
-- Реально читать `.ppgitignore`, чтобы маршрутизировать команды между
-  публичным и приватным репозиториями.
-- Команды для настройки и синхронизации обоих GitHub-remote'ов
-  (`repo-name` публичный, `pp-repo-name` приватный).
+- Реально читать `.ppgitignore`, чтобы маршрутизировать обычные команды
+  (`add`, `commit`, `status`, `push`, `pull`, ...) между публичным и
+  приватным репозиториями.
 
 ### Установка
 
