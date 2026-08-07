@@ -255,7 +255,10 @@ fn check_sync(half: &Half) -> Finding {
         }
 
         return Finding::problem(
-            format!("{}: {branch} has no upstream, though {remote_branch} exists", half.name),
+            format!(
+                "{}: {branch} has no upstream, though {remote_branch} exists",
+                half.name
+            ),
             vec![
                 "`push` and `pull` have nothing to default to.".into(),
                 format!(
@@ -359,7 +362,10 @@ fn check_superset() -> Finding {
 
     let mut detail = Vec::new();
     if !absent.is_empty() {
-        detail.push(format!("{} file(s) the private half doesn't track:", absent.len()));
+        detail.push(format!(
+            "{} file(s) the private half doesn't track:",
+            absent.len()
+        ));
         detail.extend(absent.iter().map(|path| format!("    {path}")));
     }
     if !stale.is_empty() {
@@ -438,7 +444,9 @@ pub fn cmd_doctor(args: &[OsString]) -> ExitCode {
     }
 
     if !Path::new(PRIVATE_GIT_DIR).is_dir() || !Path::new(PUBLIC_GIT_DIR).is_dir() {
-        eprintln!("ppgit: not a ppgit project — expected both {PUBLIC_GIT_DIR} and {PRIVATE_GIT_DIR} here");
+        eprintln!(
+            "ppgit: not a ppgit project — expected both {PUBLIC_GIT_DIR} and {PRIVATE_GIT_DIR} here"
+        );
         eprintln!("  `ppgit init` sets a project up, `ppgit clone` fetches an existing one.");
         return ExitCode::FAILURE;
     }

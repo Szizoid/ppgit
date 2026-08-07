@@ -1,0 +1,19 @@
+pkgbase = ppgit-git
+	pkgdesc = Keeps a public and a private (superset) git repository of one project in sync
+	pkgver = r13.fec9bf4
+	pkgrel = 1
+	url = https://github.com/Szizoid/ppgit
+	arch = x86_64
+	license = GPL-3.0-or-later
+	makedepends = cargo
+	makedepends = git
+	depends = git
+	depends = github-cli
+	depends = gcc-libs
+	depends = glibc
+	provides = ppgit
+	conflicts = ppgit
+	source = ppgit::git+https://github.com/Szizoid/ppgit.git
+	sha256sums = SKIP
+
+pkgname = ppgit-git

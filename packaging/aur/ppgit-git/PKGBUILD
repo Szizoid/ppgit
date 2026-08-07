@@ -1,0 +1,52 @@
+# Maintainer: Szizoid <e.ivan5@ya.ru>
+
+pkgname=ppgit-git
+_pkgname=ppgit
+pkgver=r13.fec9bf4
+pkgrel=1
+pkgdesc="Keeps a public and a private (superset) git repository of one project in sync"
+arch=('x86_64')
+url="https://github.com/Szizoid/ppgit"
+license=('GPL-3.0-or-later')
+depends=('git' 'github-cli' 'gcc-libs' 'glibc')
+makedepends=('cargo' 'git')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+source=("$_pkgname::git+https://github.com/Szizoid/ppgit.git")
+sha256sums=('SKIP')
+
+pkgver() {
+	cd "$srcdir/$_pkgname"
+	if git describe --long --tags >/dev/null 2>&1; then
+		git describe --long --tags | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+	else
+		printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+	fi
+}
+
+prepare() {
+	cd "$srcdir/$_pkgname"
+	export RUSTUP_TOOLCHAIN=stable
+	cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+	cd "$srcdir/$_pkgname"
+	export RUSTUP_TOOLCHAIN=stable
+	export CARGO_TARGET_DIR=target
+	cargo build --frozen --release --all-features
+}
+
+check() {
+	cd "$srcdir/$_pkgname"
+	export RUSTUP_TOOLCHAIN=stable
+	cargo test --frozen --all-features
+}
+
+package() {
+	cd "$srcdir/$_pkgname"
+	install -Dm0755 -t "$pkgdir/usr/bin/" "target/release/$_pkgname"
+	install -Dm0755 -t "$pkgdir/usr/bin/" "target/release/pp"
+	install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname/" LICENSE
+	install -Dm0644 -t "$pkgdir/usr/share/doc/$pkgname/" README.md
+}

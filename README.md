@@ -117,6 +117,19 @@ wrapper over `git`, plus a handful of its own commands:
   repositories hold genuinely different commits, so these can't simply be
   mirrored — what they should do in dual mode is still an open question.
 
+### Requirements
+
+- **git** — ppgit is a wrapper, not a reimplementation; everything is done
+  by calling it.
+- **[`gh`](https://cli.github.com/), logged in** — needed by `init`, `clone`
+  and (only to verify a remote) `doctor`. Everything else works without it.
+  This also means the GitHub half of ppgit is GitHub-only: the local half
+  of the split is plain git and cares about nothing else, but ppgit won't
+  create or find repositories anywhere but GitHub.
+- Developed and used on Linux. Nothing in it is knowingly platform-specific
+  beyond reporting a signal-killed git on Unix, but other platforms are
+  untested.
+
 ### Installation
 
 ```sh
@@ -252,6 +265,20 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
   `reset <sha>`), сейчас уходят только в публичный репозиторий. У двух
   репозиториев принципиально разные коммиты, поэтому просто зеркалить их
   нельзя — что они должны делать в дуальном режиме, пока открытый вопрос.
+
+### Требования
+
+- **git** — ppgit это обёртка, а не переписанный git; вся работа делается
+  вызовами git.
+- **[`gh`](https://cli.github.com/), с выполненным входом** — нужен для
+  `init`, `clone` и (только чтобы проверить remote) `doctor`. Всё остальное
+  работает и без него. Отсюда же следует, что GitHub-половина ppgit
+  умеет только GitHub: локальная часть разделения — обычный git, которому
+  всё равно, но создавать и находить репозитории ppgit будет только на
+  GitHub.
+- Разрабатывается и используется под Linux. Ничего заведомо
+  платформозависимого, кроме сообщения об убитом сигналом git на Unix, в
+  нём нет, но на других платформах не проверялось.
 
 ### Установка
 

@@ -10,8 +10,7 @@ use std::process::ExitCode;
 
 use cli::{Builtin, Scope, is_push, recognize, resolve_scope, split_scope};
 use commands::{
-    clone::cmd_clone, cmd_help, cmd_version, commit::cmd_commit, doctor::cmd_doctor,
-    init::cmd_init,
+    clone::cmd_clone, cmd_help, cmd_version, commit::cmd_commit, doctor::cmd_doctor, init::cmd_init,
 };
 use exec::{PRIVATE_GIT_PREFIX, PUBLIC_GIT_PREFIX, to_git};
 use ppgitignore::{

@@ -1,1 +1,8 @@
 /target
+
+# makepkg leaves these behind when a PKGBUILD is built where it lives
+packaging/aur/*/src/
+packaging/aur/*/pkg/
+packaging/aur/*/ppgit/
+packaging/aur/*/*.pkg.tar.*
+packaging/aur/*/*.log

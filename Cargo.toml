@@ -2,11 +2,18 @@
 name = "ppgit"
 version = "0.8.0"
 edition = "2024"
+# Edition 2024 landed in 1.85; without this an older toolchain fails with a
+# parse error instead of saying what it actually needs.
+rust-version = "1.85"
+readme = "README.md"
 authors = ["Szizoid <e.ivan5@ya.ru>"]
 description = "CLI wrapper over git for keeping a public and a private (superset) repository of the same project in sync"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/Szizoid/ppgit"
 keywords = ["git", "cli", "public-private", "dotfiles"]
+# Distribution packaging isn't needed to build the crate, and the AUR takes
+# its copy from the git repository rather than from here.
+exclude = ["packaging/"]
 categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
