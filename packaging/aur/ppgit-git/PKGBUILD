@@ -2,7 +2,7 @@
 
 pkgname=ppgit-git
 _pkgname=ppgit
-pkgver=r13.fec9bf4
+pkgver=r14.647086c
 pkgrel=1
 pkgdesc="Keeps a public and a private (superset) git repository of one project in sync"
 arch=('x86_64')
