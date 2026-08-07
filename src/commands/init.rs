@@ -1,9 +1,10 @@
-use std::fs::{File, OpenOptions};
-use std::io::{self, ErrorKind, Read, Write};
+use std::fs::OpenOptions;
+use std::io::{self, ErrorKind, Write};
 use std::process::ExitCode;
 
 use crate::exec::{io_checked, run_loud_checked, run_quiet_ok};
 use crate::gh::{ensure_gh_ready, repo_create, repo_exists, repo_url};
+use crate::ppgitignore::{PPGITIGNORE, PRIVATE_GIT_DIR, sync_excludes};
 
 const PPGITIGNORE_TEMPLATE: &str = "# List the files or directories below that should be excluded from the\n\
                                      # public repository and kept only in the private one.\n";
@@ -14,24 +15,12 @@ fn create_ppgitignore_template() -> io::Result<()> {
     match OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(".ppgitignore")
+        .open(PPGITIGNORE)
     {
         Ok(mut file) => file.write_all(PPGITIGNORE_TEMPLATE.as_bytes()),
         Err(e) if e.kind() == ErrorKind::AlreadyExists => Ok(()),
         Err(e) => Err(e),
     }
-}
-
-const PPGIT_GITIGNORE_MARKER: &str = "# ppgit";
-
-fn exclusions_exists(file: &mut File) -> io::Result<bool> {
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    Ok(contents.contains(PPGIT_GITIGNORE_MARKER))
-}
-
-fn write_ppgit_exclusions(file: &mut File) -> io::Result<()> {
-    file.write_all(format!("\n{PPGIT_GITIGNORE_MARKER}\n/.ppgit/\n/.ppgitignore\n").as_bytes())
 }
 
 /// The public repo's name defaults to the current directory's name — the
@@ -79,23 +68,8 @@ pub fn cmd_init() -> ExitCode {
 fn try_init() -> Result<(), ExitCode> {
     run_loud_checked("git", &["init"])?;
     io_checked(create_ppgitignore_template(), "create .ppgitignore")?;
-    run_loud_checked("git", &["init", "--bare", ".ppgit"])?;
-
-    let mut gitignore = io_checked(
-        OpenOptions::new()
-            .read(true)
-            .append(true)
-            .create(true)
-            .open(".gitignore"),
-        "open .gitignore",
-    )?;
-
-    if !io_checked(exclusions_exists(&mut gitignore), "read .gitignore")? {
-        io_checked(
-            write_ppgit_exclusions(&mut gitignore),
-            "write to .gitignore",
-        )?;
-    }
+    run_loud_checked("git", &["init", "--bare", PRIVATE_GIT_DIR])?;
+    io_checked(sync_excludes(), "sync exclude files")?;
 
     let public_name = io_checked(project_name(), "determine project name")?;
     let private_name = format!("pp-{public_name}");

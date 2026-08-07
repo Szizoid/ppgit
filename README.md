@@ -36,13 +36,27 @@ wrapper over `git`, plus a handful of its own commands:
 
   Every step is safe to run more than once — nothing gets recreated or
   duplicated on a second `ppgit init`.
+- `.ppgitignore` is live: before every command, ppgit regenerates a managed
+  block in each git-dir's `info/exclude` — the public one hides `.ppgit/`,
+  `.ppgitignore` itself and everything the list names; the private one only
+  hides `.ppgit/` (it's the superset, it tracks everything else). Edits to
+  `.ppgitignore` take effect on the very next command. `info/exclude` is
+  used rather than `.gitignore` because it's never committed, so the public
+  repository gives away neither the private half's existence nor which
+  paths are private. Anything you wrote in `info/exclude` yourself is left
+  alone.
+- ppgit warns when the public repository still tracks a file that
+  `.ppgitignore` now lists — excluding a path only hides it while it's
+  untracked, so a file committed publicly *before* being listed keeps going
+  out with every push. Ordinary commands still run (with the warning), but
+  `push` is refused until it's resolved, and ppgit prints the
+  `git rm --cached` lines needed to fix it.
 - A `pp` alias binary is built alongside `ppgit`.
 
 ### Plans (not finalized)
 
-- Actually reading `.ppgitignore` to route regular commands (`add`,
-  `commit`, `status`, `push`, `pull`, ...) between the public and private
-  repositories.
+- Routing regular commands (`add`, `commit`, `status`, `push`, `pull`, ...)
+  to both repositories at once, instead of only the public one.
 
 ### Installation
 
@@ -94,13 +108,28 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
 
   Каждый шаг безопасно запускать повторно — при втором `ppgit init` ничего
   не пересоздаётся и не дублируется.
+- `.ppgitignore` работает вживую: перед каждой командой ppgit
+  перегенерирует управляемый блок в `info/exclude` каждого git-dir —
+  публичный прячет `.ppgit/`, сам `.ppgitignore` и всё, что перечислено в
+  списке; приватный прячет только `.ppgit/` (он суперсет, всё остальное
+  отслеживает). Правки `.ppgitignore` подхватываются следующей же
+  командой. Используется именно `info/exclude`, а не `.gitignore`, потому
+  что он никогда не коммитится — публичный репозиторий не выдаёт ни факт
+  существования приватной половины, ни то, какие пути приватные. Строки,
+  которые вы написали в `info/exclude` сами, не затрагиваются.
+- ppgit предупреждает, если публичный репозиторий всё ещё отслеживает
+  файл, который теперь перечислен в `.ppgitignore`: исключение прячет путь
+  только пока он неотслеживаемый, поэтому файл, закоммиченный публично
+  *до* попадания в список, продолжит уезжать с каждым push. Обычные
+  команды при этом выполняются (с предупреждением), а `push` отклоняется
+  до устранения конфликта — ppgit печатает готовые строки
+  `git rm --cached` для исправления.
 - Рядом с `ppgit` собирается алиас `pp`.
 
 ### Планы (не финализировано)
 
-- Реально читать `.ppgitignore`, чтобы маршрутизировать обычные команды
-  (`add`, `commit`, `status`, `push`, `pull`, ...) между публичным и
-  приватным репозиториями.
+- Маршрутизация обычных команд (`add`, `commit`, `status`, `push`,
+  `pull`, ...) сразу в оба репозитория, а не только в публичный.
 
 ### Установка
 
