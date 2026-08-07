@@ -3,6 +3,10 @@ use std::process::ExitCode;
 
 use crate::exec::{run_loud_checked, run_quiet_ok, run_quiet_stdout};
 
+/// A ppgit project is two GitHub repositories: `<name>` for the public
+/// half and `pp-<name>` for the private one.
+pub const PRIVATE_NAME_PREFIX: &str = "pp-";
+
 /// Confirms `gh` is installed and logged in. Call this once, before relying
 /// on `repo_exists` returning `false` to actually mean "doesn't exist" —
 /// otherwise "gh missing"/"not authenticated" silently look the same as
@@ -23,6 +27,43 @@ pub fn repo_exists(name: &str) -> bool {
     run_quiet_ok("gh", &["repo", "view", name])
 }
 
+/// What `gh` knows about a repository that `clone` needs: its canonical
+/// `owner/name` (the user may have named it any of the several ways gh
+/// accepts — bare name, `owner/name`, or a full URL) and whether it's
+/// private, which is what tells the two halves of a project apart.
+pub struct RepoIdentity {
+    pub name_with_owner: String,
+    pub is_private: bool,
+}
+
+/// Looks `repo` up on GitHub. One round trip: `-q` with two expressions
+/// prints one value per line, which is enough structure to read back
+/// without a JSON parser (ppgit has no dependencies).
+pub fn repo_identity(repo: &str) -> io::Result<RepoIdentity> {
+    let output = run_quiet_stdout(
+        "gh",
+        &[
+            "repo",
+            "view",
+            repo,
+            "--json",
+            "nameWithOwner,isPrivate",
+            "-q",
+            ".nameWithOwner, .isPrivate",
+        ],
+    )?;
+
+    match output.lines().collect::<Vec<_>>()[..] {
+        [name_with_owner, is_private] => Ok(RepoIdentity {
+            name_with_owner: name_with_owner.to_string(),
+            is_private: is_private == "true",
+        }),
+        _ => Err(io::Error::other(format!(
+            "unexpected reply from gh when looking up {repo}: {output:?}"
+        ))),
+    }
+}
+
 /// Creates a new, empty GitHub repository named `name` (no `--source`/
 /// `--push` — ppgit wires the remote up itself afterwards, since gh's
 /// "current repo" auto-detection isn't meant for a directory with two
@@ -31,7 +72,7 @@ pub fn repo_exists(name: &str) -> bool {
 /// output.
 pub fn repo_create(name: &str, private: bool) -> Result<(), ExitCode> {
     let visibility = if private { "--private" } else { "--public" };
-    run_loud_checked("gh", &["repo", "create", name, visibility])
+    run_loud_checked("gh", ["repo", "create", name, visibility])
 }
 
 /// The repository's clone URL, in whichever protocol `gh` is configured to

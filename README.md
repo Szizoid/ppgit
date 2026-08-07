@@ -40,6 +40,24 @@ wrapper over `git`, plus a handful of its own commands:
 
   Every step is safe to run more than once — nothing gets recreated or
   duplicated on a second `ppgit init`.
+- `ppgit clone <repository> [<directory>]` is the other way in: it sets an
+  existing project up on a second machine, where `ppgit init` has nothing to
+  work from. The repository can be named any way `gh` accepts one — `name`,
+  `owner/name` or a URL — and can be *either* half: ppgit checks its
+  visibility, works out the counterpart (`name` ↔ `pp-name`), and refuses
+  the whole thing if that counterpart isn't there, rather than half-building
+  a project out of a repository that never had a private side.
+
+  The public half is cloned normally, the private one as a bare `.ppgit`
+  git-dir over the same working tree; the working tree then comes from the
+  private HEAD, since it's the superset. A bare clone needs two things put
+  back that `git clone --bare` doesn't set up — a fetch refspec (without it
+  no branch has an upstream, so `pull` is left guessing and `status` can
+  never report ahead/behind) and an index (without it every tracked file
+  reads as deleted) — and `ppgit clone` does both, so the result is a
+  project you can `pull` and `commit` in immediately. If the two halves come
+  down on different default branches, that's reported: they share a working
+  tree, so ppgit needs them in step.
 - Commands are routed to one repository or both. `add`, `commit`, `status`,
   `rm`, `mv`, `restore`, `push`, `pull` and `fetch` run against both by
   default; everything else describes history, which the two are entitled to
@@ -140,6 +158,26 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
 
   Каждый шаг безопасно запускать повторно — при втором `ppgit init` ничего
   не пересоздаётся и не дублируется.
+- `ppgit clone <репозиторий> [<директория>]` — второй вход в проект: он
+  разворачивает уже существующий проект на другой машине, где `ppgit init`
+  не от чего отталкиваться. Репозиторий можно назвать любым способом,
+  который понимает `gh` — `name`, `owner/name` или URL, — и это может быть
+  *любая* из двух половин: ppgit смотрит на её видимость, вычисляет парную
+  (`name` ↔ `pp-name`) и отказывается работать, если пары нет, вместо того
+  чтобы наполовину собрать проект из репозитория, у которого приватной
+  стороны никогда и не было.
+
+  Публичная половина клонируется обычным образом, приватная — как
+  bare-git-dir `.ppgit` поверх того же рабочего дерева; само дерево затем
+  берётся из приватного HEAD, поскольку он superset. Bare-клону нужно
+  вернуть две вещи, которых `git clone --bare` не настраивает: fetch-refspec
+  (без него ни у одной ветки нет upstream, так что `pull` вынужден
+  догадываться, а `status` никогда не покажет ahead/behind) и индекс (без
+  него все отслеживаемые файлы читаются как удалённые). `ppgit clone` делает
+  и то, и другое, так что в результате получается проект, в котором сразу
+  можно делать `pull` и `commit`. Если половины приехали на разных ветках по
+  умолчанию, об этом сообщается: рабочее дерево у них одно, и ppgit нужно,
+  чтобы ветки совпадали.
 - Команды маршрутизируются в один репозиторий или в оба. `add`, `commit`,
   `status`, `rm`, `mv`, `restore`, `push`, `pull` и `fetch` по умолчанию
   идут в оба; всё остальное описывает историю, которую два репозитория

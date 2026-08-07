@@ -1,5 +1,6 @@
 use std::process::ExitCode;
 
+pub mod clone;
 pub mod commit;
 pub mod init;
 
@@ -13,6 +14,10 @@ pp <git-command> [args...]      (alias for ppgit)
 
 Every command is forwarded to git as-is — `ppgit status` is exactly
 `git status`. Run `git --help` for git's own commands and flags.
+
+ppgit's own commands:
+ppgit init                      set up both halves of a project here
+ppgit clone <repo> [<dir>]      set up both halves from GitHub
 
 {repo}",
         version = env!("CARGO_PKG_VERSION"),

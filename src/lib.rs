@@ -9,7 +9,7 @@ use std::ffi::OsString;
 use std::process::ExitCode;
 
 use cli::{Builtin, Scope, is_push, recognize, resolve_scope, split_scope};
-use commands::{cmd_help, cmd_version, commit::cmd_commit, init::cmd_init};
+use commands::{cmd_help, cmd_version, clone::cmd_clone, commit::cmd_commit, init::cmd_init};
 use exec::{PRIVATE_GIT_PREFIX, PUBLIC_GIT_PREFIX, to_git};
 use ppgitignore::{
     PPGITIGNORE, PRIVATE_GIT_DIR, PUBLIC_GIT_DIR, sync_excludes, tracked_but_ignored,
@@ -55,6 +55,7 @@ pub fn run() -> ExitCode {
         Some(Builtin::Help) => cmd_help(),
         Some(Builtin::Version) => cmd_version(),
         Some(Builtin::Init) => cmd_init(),
+        Some(Builtin::Clone) => cmd_clone(rest),
         Some(Builtin::Commit) => cmd_commit(scope, rest),
         None => match scope {
             Scope::Public => to_git(PUBLIC_GIT_PREFIX, rest),

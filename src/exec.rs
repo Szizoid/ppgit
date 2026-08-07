@@ -22,8 +22,14 @@ where
 
 /// `run_loud`, but `Ok(())` only if the program was launched *and* exited
 /// successfully — any other outcome becomes the `ExitCode` a top-level
-/// command (e.g. `cmd_init`) should return.
-pub fn run_loud_checked(program: &str, args: &[&str]) -> Result<(), ExitCode> {
+/// command (e.g. `cmd_init`) should return. Generic over the same bound as
+/// `run_loud`, so a command line that has to carry a user-supplied path
+/// (`clone`'s destination directory) isn't forced through `&str`.
+pub fn run_loud_checked<I, S>(program: &str, args: I) -> Result<(), ExitCode>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
     match run_loud(program, args) {
         Ok(status) if status.success() => Ok(()),
         Ok(status) => Err(status_to_exit_code(&status)),
@@ -117,7 +123,13 @@ impl IntoExitCode for ExitStatus {
 /// Puts git on the private repository: a bare git-dir sharing the public
 /// repository's working tree. The public half needs no such prefix — it's
 /// a perfectly ordinary repository that git finds by itself.
-pub const PRIVATE_GIT_PREFIX: &[&str] = &["--git-dir=.ppgit", "--work-tree=."];
+///
+/// The two halves are also spelled out separately, for the commands that
+/// build a git-dir-qualified command line one argument at a time, and for
+/// the few that address the bare git-dir without a work tree at all.
+pub const PRIVATE_GIT_ARG: &str = "--git-dir=.ppgit";
+pub const WORK_TREE_ARG: &str = "--work-tree=.";
+pub const PRIVATE_GIT_PREFIX: &[&str] = &[PRIVATE_GIT_ARG, WORK_TREE_ARG];
 pub const PUBLIC_GIT_PREFIX: &[&str] = &[];
 
 /// The passthrough path: forwards `args` to `git` as-is, interactively,

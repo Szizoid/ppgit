@@ -3,12 +3,9 @@ use std::io::{self, ErrorKind, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-use crate::exec::{io_checked, run_loud_checked, run_quiet_ok};
-use crate::gh::{ensure_gh_ready, repo_create, repo_exists, repo_url};
+use crate::exec::{PRIVATE_GIT_ARG, WORK_TREE_ARG, io_checked, run_loud_checked, run_quiet_ok};
+use crate::gh::{PRIVATE_NAME_PREFIX, ensure_gh_ready, repo_create, repo_exists, repo_url};
 use crate::ppgitignore::{PPGITIGNORE, PRIVATE_GIT_DIR, PUBLIC_GIT_DIR, sync_excludes};
-
-const PRIVATE_GIT_ARG: &str = "--git-dir=.ppgit";
-const WORK_TREE_ARG: &str = "--work-tree=.";
 
 const PPGITIGNORE_TEMPLATE: &str = "# List the files or directories below that should be excluded from the\n\
                                      # public repository and kept only in the private one.\n";
@@ -44,20 +41,20 @@ fn ensure_private_repo() -> Result<(), ExitCode> {
     // cloning one only produces a puzzling "you cloned an empty
     // repository" warning.
     if !run_quiet_ok("git", &["rev-parse", "--verify", "HEAD"]) {
-        return run_loud_checked("git", &["init", "--bare", PRIVATE_GIT_DIR]);
+        return run_loud_checked("git", ["init", "--bare", PRIVATE_GIT_DIR]);
     }
 
-    run_loud_checked("git", &["clone", "--bare", PUBLIC_GIT_DIR, PRIVATE_GIT_DIR])?;
+    run_loud_checked("git", ["clone", "--bare", PUBLIC_GIT_DIR, PRIVATE_GIT_DIR])?;
 
     // A bare clone points `origin` at the local git-dir it copied; the
     // private repository's origin belongs to its own GitHub remote, which
     // `ensure_remote` sets further down.
-    run_loud_checked("git", &[PRIVATE_GIT_ARG, "remote", "remove", "origin"])?;
+    run_loud_checked("git", [PRIVATE_GIT_ARG, "remote", "remove", "origin"])?;
 
     // It also has no index, which would leave every tracked file looking
     // deleted and untracked at the same time. Filling it from HEAD settles
     // the private half into a clean working state.
-    run_loud_checked("git", &[PRIVATE_GIT_ARG, WORK_TREE_ARG, "reset", "-q"])
+    run_loud_checked("git", [PRIVATE_GIT_ARG, WORK_TREE_ARG, "reset", "-q"])
 }
 
 /// The public repo's name defaults to the current directory's name — the
@@ -105,14 +102,14 @@ pub fn cmd_init() -> ExitCode {
 /// Spares the user a `--set-upstream` on the first push of every branch.
 /// Both repositories have exactly one remote each, so there's never any
 /// ambiguity about what a new branch should track.
-fn ensure_auto_upstream(git_dir_args: &[&str]) -> Result<(), ExitCode> {
+pub(crate) fn ensure_auto_upstream(git_dir_args: &[&str]) -> Result<(), ExitCode> {
     let mut args = git_dir_args.to_vec();
     args.extend(["config", "push.autoSetupRemote", "true"]);
     run_loud_checked("git", &args)
 }
 
 fn try_init() -> Result<(), ExitCode> {
-    run_loud_checked("git", &["init"])?;
+    run_loud_checked("git", ["init"])?;
     io_checked(create_ppgitignore_template(), "create .ppgitignore")?;
     ensure_private_repo()?;
     io_checked(sync_excludes(), "sync exclude files")?;
@@ -121,7 +118,7 @@ fn try_init() -> Result<(), ExitCode> {
     ensure_auto_upstream(&[PRIVATE_GIT_ARG])?;
 
     let public_name = io_checked(project_name(), "determine project name")?;
-    let private_name = format!("pp-{public_name}");
+    let private_name = format!("{PRIVATE_NAME_PREFIX}{public_name}");
 
     ensure_gh_ready()?;
     ensure_repo(&public_name, false)?;

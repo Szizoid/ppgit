@@ -8,6 +8,7 @@ pub enum Builtin {
     Help,
     Version,
     Init,
+    Clone,
     Commit,
 }
 
@@ -19,6 +20,7 @@ pub fn recognize(args: &[OsString]) -> Option<Builtin> {
         Some("help") | Some("--help") | Some("-h") => Some(Builtin::Help),
         Some("--version") | Some("-V") => Some(Builtin::Version),
         Some("init") => Some(Builtin::Init),
+        Some("clone") => Some(Builtin::Clone),
         Some("commit") => Some(Builtin::Commit),
         _ => None,
     }
