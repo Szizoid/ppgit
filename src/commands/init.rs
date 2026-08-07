@@ -65,11 +65,23 @@ pub fn cmd_init() -> ExitCode {
     }
 }
 
+/// Spares the user a `--set-upstream` on the first push of every branch.
+/// Both repositories have exactly one remote each, so there's never any
+/// ambiguity about what a new branch should track.
+fn ensure_auto_upstream(git_dir_args: &[&str]) -> Result<(), ExitCode> {
+    let mut args = git_dir_args.to_vec();
+    args.extend(["config", "push.autoSetupRemote", "true"]);
+    run_loud_checked("git", &args)
+}
+
 fn try_init() -> Result<(), ExitCode> {
     run_loud_checked("git", &["init"])?;
     io_checked(create_ppgitignore_template(), "create .ppgitignore")?;
     run_loud_checked("git", &["init", "--bare", PRIVATE_GIT_DIR])?;
     io_checked(sync_excludes(), "sync exclude files")?;
+
+    ensure_auto_upstream(&[])?;
+    ensure_auto_upstream(&["--git-dir=.ppgit"])?;
 
     let public_name = io_checked(project_name(), "determine project name")?;
     let private_name = format!("pp-{public_name}");

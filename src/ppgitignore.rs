@@ -55,7 +55,12 @@ fn with_managed_block(existing: &str, body: &str) -> String {
         after_block += 1;
     }
 
-    format!("{}{}{}", &existing[..start], block, &existing[after_block..])
+    format!(
+        "{}{}{}",
+        &existing[..start],
+        block,
+        &existing[after_block..]
+    )
 }
 
 /// Rewrites the managed block in `<git_dir>/info/exclude`. Skips the write

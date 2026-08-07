@@ -114,11 +114,24 @@ impl IntoExitCode for ExitStatus {
     }
 }
 
-/// The passthrough path: forwards `args` to `git` as-is, interactively —
-/// this is the one place ppgit runs an entirely user-controlled command
-/// line, so it must stay on the `run_loud` family no matter what.
-pub fn to_git(args: &[OsString]) -> ExitCode {
-    match run_loud("git", args) {
+/// Puts git on the private repository: a bare git-dir sharing the public
+/// repository's working tree. The public half needs no such prefix — it's
+/// a perfectly ordinary repository that git finds by itself.
+pub const PRIVATE_GIT_PREFIX: &[&str] = &["--git-dir=.ppgit", "--work-tree=."];
+pub const PUBLIC_GIT_PREFIX: &[&str] = &[];
+
+/// The passthrough path: forwards `args` to `git` as-is, interactively,
+/// with `prefix` selecting which repository it lands on. This is the one
+/// place ppgit runs an entirely user-controlled command line, so it must
+/// stay on the `run_loud` family no matter what.
+pub fn to_git(prefix: &[&str], args: &[OsString]) -> ExitCode {
+    let full: Vec<OsString> = prefix
+        .iter()
+        .map(OsString::from)
+        .chain(args.iter().cloned())
+        .collect();
+
+    match run_loud("git", &full) {
         Ok(status) => status.into_exit_code("git"),
         Err(e) => {
             eprintln!("ppgit: failed to launch git: {e}");

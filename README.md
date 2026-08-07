@@ -27,15 +27,34 @@ wrapper over `git`, plus a handful of its own commands:
 - `ppgit init` sets up both halves of the public/private split:
   - locally — creates `.git` (the public, completely standard repository) if
     it's missing, a `.ppgitignore` template (left alone if it already
-    exists), a bare `.ppgit` git-dir (the private, superset repository), and
-    idempotently adds `.ppgit`/`.ppgitignore` to `.gitignore`;
+    exists), and a bare `.ppgit` git-dir (the private, superset repository);
   - on GitHub (via `gh`, after checking it's installed and logged in) —
     creates the public (`<dir-name>`) and private (`pp-<dir-name>`)
-    repositories if they don't already exist, and points `origin` in each
-    git-dir at the right one.
+    repositories if they don't already exist, points `origin` in each
+    git-dir at the right one, and turns on `push.autoSetupRemote` so the
+    first push of a branch needs no `--set-upstream`.
 
   Every step is safe to run more than once — nothing gets recreated or
   duplicated on a second `ppgit init`.
+- Commands are routed to one repository or both. `add`, `commit`, `status`,
+  `rm`, `mv`, `restore`, `push`, `pull` and `fetch` run against both by
+  default; everything else describes history, which the two are entitled to
+  disagree about, and goes to the public one — so a bare `ppgit log` shows
+  what a bare `git log` would. A leading `--public`, `--private` or
+  `--both` overrides that. In dual runs the private (superset) repository
+  goes first and alone decides the exit code: the public one deliberately
+  can't see every file, so it having nothing to do is an ordinary outcome,
+  not a failure.
+- Branch commands (`branch`, `checkout`, `switch`, `merge`) always run
+  against both and refuse `--public`/`--private`. The two repositories
+  share one working tree, so a branch existing in only one of them — or
+  the two sitting on different branches — would send the next commit
+  somewhere the other can't follow. (`checkout -- <path>` is a file
+  operation rather than a branch one, and takes scope flags as usual.)
+- `ppgit commit` opens the editor once, not once per repository: the
+  private commit is made first, interactively, and its message is reused
+  verbatim for the public one. With an explicit `-m` (or `-F`, `--fixup`,
+  ...) there's nothing to share and both simply get the same arguments.
 - `.ppgitignore` is live: before every command, ppgit regenerates a managed
   block in each git-dir's `info/exclude` — the public one hides `.ppgit/`,
   `.ppgitignore` itself and everything the list names; the private one only
@@ -55,8 +74,13 @@ wrapper over `git`, plus a handful of its own commands:
 
 ### Plans (not finalized)
 
-- Routing regular commands (`add`, `commit`, `status`, `push`, `pull`, ...)
-  to both repositories at once, instead of only the public one.
+- `ppgit doctor` — one command to check the two halves are in step:
+  branches match, remotes are set, nothing is tracked publicly that
+  shouldn't be.
+- Commands that address a specific commit (`rebase`, `cherry-pick`,
+  `reset <sha>`) currently go to the public repository only. The two
+  repositories hold genuinely different commits, so these can't simply be
+  mirrored — what they should do in dual mode is still an open question.
 
 ### Installation
 
@@ -99,15 +123,36 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
 - `ppgit init` настраивает обе половины разделения на публичное/приватное:
   - локально — создаёт `.git` (публичный, полностью обычный репозиторий),
     если его ещё нет, шаблон `.ppgitignore` (не трогается, если уже
-    существует), bare-репозиторий `.ppgit` (приватный, суперсет), и
-    идемпотентно добавляет `.ppgit`/`.ppgitignore` в `.gitignore`;
+    существует) и bare-репозиторий `.ppgit` (приватный, суперсет);
   - на GitHub (через `gh`, предварительно проверив, что он установлен и
     залогинен) — создаёт публичный (`<имя-директории>`) и приватный
-    (`pp-<имя-директории>`) репозитории, если их ещё нет, и прописывает
-    `origin` в каждом git-dir на соответствующий.
+    (`pp-<имя-директории>`) репозитории, если их ещё нет, прописывает
+    `origin` в каждом git-dir на соответствующий и включает
+    `push.autoSetupRemote`, чтобы первый push ветки не требовал
+    `--set-upstream`.
 
   Каждый шаг безопасно запускать повторно — при втором `ppgit init` ничего
   не пересоздаётся и не дублируется.
+- Команды маршрутизируются в один репозиторий или в оба. `add`, `commit`,
+  `status`, `rm`, `mv`, `restore`, `push`, `pull` и `fetch` по умолчанию
+  идут в оба; всё остальное описывает историю, которую два репозитория
+  вправе иметь разную, и уходит в публичный — чтобы голый `ppgit log`
+  показывал то же, что показал бы голый `git log`. Ведущий `--public`,
+  `--private` или `--both` это переопределяет. При дуальном запуске
+  приватный (суперсет) идёт первым и один определяет код возврата:
+  публичный по построению видит не все файлы, поэтому «ему нечего делать»
+  — штатный исход, а не ошибка.
+- Команды работы с ветками (`branch`, `checkout`, `switch`, `merge`)
+  всегда идут в оба и отклоняют `--public`/`--private`. Репозитории делят
+  одно рабочее дерево, поэтому ветка, существующая только в одном, — или
+  два репозитория на разных ветках — отправит следующий коммит туда, куда
+  второй не сможет последовать. (`checkout -- <путь>` — файловая
+  операция, а не работа с ветками, и принимает флаги scope как обычно.)
+- `ppgit commit` открывает редактор один раз, а не по разу на
+  репозиторий: сначала интерактивно делается приватный коммит, затем его
+  сообщение дословно переиспользуется для публичного. Если сообщение
+  задано явно (`-m`, `-F`, `--fixup`, ...), переиспользовать нечего — оба
+  получают одинаковые аргументы.
 - `.ppgitignore` работает вживую: перед каждой командой ppgit
   перегенерирует управляемый блок в `info/exclude` каждого git-dir —
   публичный прячет `.ppgit/`, сам `.ppgitignore` и всё, что перечислено в
@@ -128,8 +173,13 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
 
 ### Планы (не финализировано)
 
-- Маршрутизация обычных команд (`add`, `commit`, `status`, `push`,
-  `pull`, ...) сразу в оба репозитория, а не только в публичный.
+- `ppgit doctor` — одна команда, проверяющая, что половины не разъехались:
+  ветки совпадают, remote'ы на месте, публично не отслеживается ничего
+  лишнего.
+- Команды, адресующие конкретный коммит (`rebase`, `cherry-pick`,
+  `reset <sha>`), сейчас уходят только в публичный репозиторий. У двух
+  репозиториев принципиально разные коммиты, поэтому просто зеркалить их
+  нельзя — что они должны делать в дуальном режиме, пока открытый вопрос.
 
 ### Установка
 

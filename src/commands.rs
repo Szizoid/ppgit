@@ -1,5 +1,6 @@
 use std::process::ExitCode;
 
+pub mod commit;
 pub mod init;
 
 pub fn cmd_help() -> ExitCode {
