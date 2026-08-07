@@ -34,8 +34,9 @@ wrapper over `git`, plus a handful of its own commands:
   - on GitHub (via `gh`, after checking it's installed and logged in) —
     creates the public (`<dir-name>`) and private (`pp-<dir-name>`)
     repositories if they don't already exist, points `origin` in each
-    git-dir at the right one, and turns on `push.autoSetupRemote` so the
-    first push of a branch needs no `--set-upstream`.
+    git-dir at the right one (over SSH or HTTPS, whichever `gh` is
+    configured for), and turns on `push.autoSetupRemote` so the first push
+    of a branch needs no `--set-upstream`.
 
   Every step is safe to run more than once — nothing gets recreated or
   duplicated on a second `ppgit init`.
@@ -133,9 +134,9 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
   - на GitHub (через `gh`, предварительно проверив, что он установлен и
     залогинен) — создаёт публичный (`<имя-директории>`) и приватный
     (`pp-<имя-директории>`) репозитории, если их ещё нет, прописывает
-    `origin` в каждом git-dir на соответствующий и включает
-    `push.autoSetupRemote`, чтобы первый push ветки не требовал
-    `--set-upstream`.
+    `origin` в каждом git-dir на соответствующий (по SSH или HTTPS — как
+    настроен `gh`) и включает `push.autoSetupRemote`, чтобы первый push
+    ветки не требовал `--set-upstream`.
 
   Каждый шаг безопасно запускать повторно — при втором `ppgit init` ничего
   не пересоздаётся и не дублируется.
