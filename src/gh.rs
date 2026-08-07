@@ -50,6 +50,14 @@ pub fn repo_url(name: &str) -> io::Result<String> {
 
     run_quiet_stdout(
         "gh",
-        &["repo", "view", name, "--json", field, "-q", &format!(".{field}")],
+        &[
+            "repo",
+            "view",
+            name,
+            "--json",
+            field,
+            "-q",
+            &format!(".{field}"),
+        ],
     )
 }
