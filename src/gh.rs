@@ -34,11 +34,22 @@ pub fn repo_create(name: &str, private: bool) -> Result<(), ExitCode> {
     run_loud_checked("gh", &["repo", "create", name, visibility])
 }
 
-/// The repository's SSH clone URL, as reported by `gh` itself (so ppgit
-/// doesn't have to hardcode the `git@github.com:...` format).
+/// The repository's clone URL, in whichever protocol `gh` is configured to
+/// use for git operations — the same choice `gh repo clone` would make.
+/// Picking one unconditionally is how ppgit handed an SSH remote to a
+/// machine that authenticates over HTTPS, where every push then failed
+/// with `Permission denied (publickey)`.
 pub fn repo_url(name: &str) -> io::Result<String> {
+    let field = match run_quiet_stdout("gh", &["config", "get", "git_protocol"]) {
+        Ok(protocol) if protocol == "ssh" => "sshUrl",
+        // `url` is the HTTPS one. Also the fallback when gh can't say:
+        // HTTPS works with the token gh already holds, whereas SSH needs a
+        // key the user may never have set up.
+        _ => "url",
+    };
+
     run_quiet_stdout(
         "gh",
-        &["repo", "view", name, "--json", "sshUrl", "-q", ".sshUrl"],
+        &["repo", "view", name, "--json", field, "-q", &format!(".{field}")],
     )
 }
