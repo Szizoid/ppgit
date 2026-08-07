@@ -27,7 +27,10 @@ wrapper over `git`, plus a handful of its own commands:
 - `ppgit init` sets up both halves of the public/private split:
   - locally — creates `.git` (the public, completely standard repository) if
     it's missing, a `.ppgitignore` template (left alone if it already
-    exists), and a bare `.ppgit` git-dir (the private, superset repository);
+    exists), and the private `.ppgit` git-dir. In an existing project the
+    private half starts as a bare *clone* of the public history rather
+    than empty, so the two share an ancestry instead of the first private
+    commit re-creating the whole project from nothing;
   - on GitHub (via `gh`, after checking it's installed and logged in) —
     creates the public (`<dir-name>`) and private (`pp-<dir-name>`)
     repositories if they don't already exist, points `origin` in each
@@ -123,7 +126,10 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
 - `ppgit init` настраивает обе половины разделения на публичное/приватное:
   - локально — создаёт `.git` (публичный, полностью обычный репозиторий),
     если его ещё нет, шаблон `.ppgitignore` (не трогается, если уже
-    существует) и bare-репозиторий `.ppgit` (приватный, суперсет);
+    существует) и приватный git-dir `.ppgit`. В уже существующем проекте
+    приватная половина начинается не с нуля, а как bare-*клон* публичной
+    истории — так у них общий предок, вместо того чтобы первый приватный
+    коммит пересоздавал весь проект на пустом месте;
   - на GitHub (через `gh`, предварительно проверив, что он установлен и
     залогинен) — создаёт публичный (`<имя-директории>`) и приватный
     (`pp-<имя-директории>`) репозитории, если их ещё нет, прописывает

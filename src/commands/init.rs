@@ -1,10 +1,14 @@
 use std::fs::OpenOptions;
 use std::io::{self, ErrorKind, Write};
+use std::path::Path;
 use std::process::ExitCode;
 
 use crate::exec::{io_checked, run_loud_checked, run_quiet_ok};
 use crate::gh::{ensure_gh_ready, repo_create, repo_exists, repo_url};
-use crate::ppgitignore::{PPGITIGNORE, PRIVATE_GIT_DIR, sync_excludes};
+use crate::ppgitignore::{PPGITIGNORE, PRIVATE_GIT_DIR, PUBLIC_GIT_DIR, sync_excludes};
+
+const PRIVATE_GIT_ARG: &str = "--git-dir=.ppgit";
+const WORK_TREE_ARG: &str = "--work-tree=.";
 
 const PPGITIGNORE_TEMPLATE: &str = "# List the files or directories below that should be excluded from the\n\
                                      # public repository and kept only in the private one.\n";
@@ -21,6 +25,39 @@ fn create_ppgitignore_template() -> io::Result<()> {
         Err(e) if e.kind() == ErrorKind::AlreadyExists => Ok(()),
         Err(e) => Err(e),
     }
+}
+
+/// Creates the private git-dir if it isn't there yet.
+///
+/// When the public repository already has history, the private one starts
+/// as a bare clone of it rather than empty. It's meant to be a superset,
+/// and starting from nothing would leave every already-committed file
+/// looking brand new to it: the first private commit would duplicate the
+/// entire project with none of the history that produced it, and the two
+/// halves would share no ancestry at all.
+fn ensure_private_repo() -> Result<(), ExitCode> {
+    if Path::new(PRIVATE_GIT_DIR).is_dir() {
+        return Ok(());
+    }
+
+    // Nothing to inherit from a public repository without commits, and
+    // cloning one only produces a puzzling "you cloned an empty
+    // repository" warning.
+    if !run_quiet_ok("git", &["rev-parse", "--verify", "HEAD"]) {
+        return run_loud_checked("git", &["init", "--bare", PRIVATE_GIT_DIR]);
+    }
+
+    run_loud_checked("git", &["clone", "--bare", PUBLIC_GIT_DIR, PRIVATE_GIT_DIR])?;
+
+    // A bare clone points `origin` at the local git-dir it copied; the
+    // private repository's origin belongs to its own GitHub remote, which
+    // `ensure_remote` sets further down.
+    run_loud_checked("git", &[PRIVATE_GIT_ARG, "remote", "remove", "origin"])?;
+
+    // It also has no index, which would leave every tracked file looking
+    // deleted and untracked at the same time. Filling it from HEAD settles
+    // the private half into a clean working state.
+    run_loud_checked("git", &[PRIVATE_GIT_ARG, WORK_TREE_ARG, "reset", "-q"])
 }
 
 /// The public repo's name defaults to the current directory's name — the
@@ -77,11 +114,11 @@ fn ensure_auto_upstream(git_dir_args: &[&str]) -> Result<(), ExitCode> {
 fn try_init() -> Result<(), ExitCode> {
     run_loud_checked("git", &["init"])?;
     io_checked(create_ppgitignore_template(), "create .ppgitignore")?;
-    run_loud_checked("git", &["init", "--bare", PRIVATE_GIT_DIR])?;
+    ensure_private_repo()?;
     io_checked(sync_excludes(), "sync exclude files")?;
 
     ensure_auto_upstream(&[])?;
-    ensure_auto_upstream(&["--git-dir=.ppgit"])?;
+    ensure_auto_upstream(&[PRIVATE_GIT_ARG])?;
 
     let public_name = io_checked(project_name(), "determine project name")?;
     let private_name = format!("pp-{public_name}");
@@ -94,7 +131,7 @@ fn try_init() -> Result<(), ExitCode> {
     let private_url = io_checked(repo_url(&private_name), "get private repo URL")?;
 
     ensure_remote(&[], &public_url)?;
-    ensure_remote(&["--git-dir=.ppgit"], &private_url)?;
+    ensure_remote(&[PRIVATE_GIT_ARG], &private_url)?;
 
     Ok(())
 }
