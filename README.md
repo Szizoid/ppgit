@@ -92,13 +92,26 @@ wrapper over `git`, plus a handful of its own commands:
   out with every push. Ordinary commands still run (with the warning), but
   `push` is refused until it's resolved, and ppgit prints the
   `git rm --cached` lines needed to fix it.
+- `ppgit doctor` checks, in one command, that the two halves are in step,
+  and reports rather than repairs — every finding comes with the command
+  that fixes it. It first fetches both remotes (being offline isn't fatal,
+  it just says the comparisons are against what was last seen), then looks
+  at: both halves being on the same branch; each having an `origin`, and
+  one pointing where ppgit itself would point it today (a remote in the
+  wrong protocol fails every push, and `init` leaves an existing `origin`
+  alone however wrong it is); each having a fetch refspec, without which no
+  branch can have an upstream and `pull` is reduced to guessing; how each
+  stands against its remote, where being ahead or behind is merely noted
+  but having *diverged* is a problem, since neither `push` nor `pull`
+  settles it; the **superset invariant** — that the private repository
+  holds every file the public one tracks, at the same content — which is
+  what a public-only `pull` quietly breaks; and files still tracked
+  publicly despite `.ppgitignore` listing them. The exit code is non-zero
+  when anything is actually wrong, so it can gate a script.
 - A `pp` alias binary is built alongside `ppgit`.
 
 ### Plans (not finalized)
 
-- `ppgit doctor` — one command to check the two halves are in step:
-  branches match, remotes are set, nothing is tracked publicly that
-  shouldn't be.
 - Commands that address a specific commit (`rebase`, `cherry-pick`,
   `reset <sha>`) currently go to the public repository only. The two
   repositories hold genuinely different commits, so these can't simply be
@@ -214,13 +227,27 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
   команды при этом выполняются (с предупреждением), а `push` отклоняется
   до устранения конфликта — ppgit печатает готовые строки
   `git rm --cached` для исправления.
+- `ppgit doctor` одной командой проверяет, что половины не разъехались, и
+  при этом сообщает, а не чинит — к каждой находке прилагается команда,
+  которая её исправляет. Сначала он делает fetch в обе половины (отсутствие
+  сети не фатально, просто в отчёте будет сказано, что сравнение идёт с
+  последним известным состоянием), а затем смотрит: обе ли половины на одной
+  ветке; есть ли у каждой `origin` и указывает ли он туда, куда ppgit
+  направил бы его сегодня (remote не в том протоколе роняет любой push, а
+  `init` не трогает уже существующий `origin`, каким бы неправильным тот ни
+  был); есть ли fetch-refspec, без которого ни у одной ветки не может быть
+  upstream, а `pull` вынужден догадываться; как каждая половина соотносится
+  со своим remote — отставание и опережение просто отмечаются, а вот
+  **расхождение** это проблема, потому что ни `push`, ни `pull` его сами не
+  разрешат; **superset-инвариант** — что приватный репозиторий содержит все
+  файлы, отслеживаемые публичным, и в том же состоянии, — который молча
+  ломает публичный `pull`; и файлы, всё ещё отслеживаемые публично вопреки
+  `.ppgitignore`. Код возврата ненулевой, только если что-то действительно
+  не так, — так что doctor годится в качестве проверки в скрипте.
 - Рядом с `ppgit` собирается алиас `pp`.
 
 ### Планы (не финализировано)
 
-- `ppgit doctor` — одна команда, проверяющая, что половины не разъехались:
-  ветки совпадают, remote'ы на месте, публично не отслеживается ничего
-  лишнего.
 - Команды, адресующие конкретный коммит (`rebase`, `cherry-pick`,
   `reset <sha>`), сейчас уходят только в публичный репозиторий. У двух
   репозиториев принципиально разные коммиты, поэтому просто зеркалить их

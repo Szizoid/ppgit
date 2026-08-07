@@ -10,6 +10,7 @@ pub enum Builtin {
     Init,
     Clone,
     Commit,
+    Doctor,
 }
 
 pub fn recognize(args: &[OsString]) -> Option<Builtin> {
@@ -22,6 +23,7 @@ pub fn recognize(args: &[OsString]) -> Option<Builtin> {
         Some("init") => Some(Builtin::Init),
         Some("clone") => Some(Builtin::Clone),
         Some("commit") => Some(Builtin::Commit),
+        Some("doctor") => Some(Builtin::Doctor),
         _ => None,
     }
 }

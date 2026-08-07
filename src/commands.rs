@@ -2,6 +2,7 @@ use std::process::ExitCode;
 
 pub mod clone;
 pub mod commit;
+pub mod doctor;
 pub mod init;
 
 pub fn cmd_help() -> ExitCode {
@@ -18,6 +19,7 @@ Every command is forwarded to git as-is — `ppgit status` is exactly
 ppgit's own commands:
 ppgit init                      set up both halves of a project here
 ppgit clone <repo> [<dir>]      set up both halves from GitHub
+ppgit doctor                    check the two halves are in step
 
 {repo}",
         version = env!("CARGO_PKG_VERSION"),

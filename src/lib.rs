@@ -9,7 +9,10 @@ use std::ffi::OsString;
 use std::process::ExitCode;
 
 use cli::{Builtin, Scope, is_push, recognize, resolve_scope, split_scope};
-use commands::{cmd_help, cmd_version, clone::cmd_clone, commit::cmd_commit, init::cmd_init};
+use commands::{
+    clone::cmd_clone, cmd_help, cmd_version, commit::cmd_commit, doctor::cmd_doctor,
+    init::cmd_init,
+};
 use exec::{PRIVATE_GIT_PREFIX, PUBLIC_GIT_PREFIX, to_git};
 use ppgitignore::{
     PPGITIGNORE, PRIVATE_GIT_DIR, PUBLIC_GIT_DIR, sync_excludes, tracked_but_ignored,
@@ -28,20 +31,26 @@ pub fn run() -> ExitCode {
     }
 
     let (explicit_scope, rest) = split_scope(&args);
+    let builtin = recognize(rest);
 
-    match tracked_but_ignored() {
-        Ok(conflicts) if !conflicts.is_empty() => {
-            warn_tracked_but_ignored(&conflicts);
-            if is_push(rest) {
-                eprintln!("ppgit: refusing to push until the above is resolved");
-                return ExitCode::FAILURE;
+    // `doctor` reports on this itself, in its own format and alongside
+    // everything else it checked — warning here too would only say it
+    // twice, and out of order.
+    if !matches!(builtin, Some(Builtin::Doctor)) {
+        match tracked_but_ignored() {
+            Ok(conflicts) if !conflicts.is_empty() => {
+                warn_tracked_but_ignored(&conflicts);
+                if is_push(rest) {
+                    eprintln!("ppgit: refusing to push until the above is resolved");
+                    return ExitCode::FAILURE;
+                }
             }
+            Ok(_) => {}
+            // A failed *check* only costs a warning — unlike a failed
+            // sync, it doesn't itself make a leak more likely, and dying
+            // here would block ordinary work for no gain.
+            Err(e) => eprintln!("ppgit: warning: could not check for {PPGITIGNORE} conflicts: {e}"),
         }
-        Ok(_) => {}
-        // A failed *check* only costs a warning — unlike a failed sync,
-        // it doesn't itself make a leak more likely, and dying here would
-        // block ordinary work for no gain.
-        Err(e) => eprintln!("ppgit: warning: could not check for {PPGITIGNORE} conflicts: {e}"),
     }
 
     let scope = match resolve_scope(explicit_scope, rest) {
@@ -49,7 +58,7 @@ pub fn run() -> ExitCode {
         Err(code) => return code,
     };
 
-    match recognize(rest) {
+    match builtin {
         // ppgit's own commands aren't per-repository, so a scope flag has
         // nothing to select between and is simply not consulted for them.
         Some(Builtin::Help) => cmd_help(),
@@ -57,6 +66,7 @@ pub fn run() -> ExitCode {
         Some(Builtin::Init) => cmd_init(),
         Some(Builtin::Clone) => cmd_clone(rest),
         Some(Builtin::Commit) => cmd_commit(scope, rest),
+        Some(Builtin::Doctor) => cmd_doctor(rest),
         None => match scope {
             Scope::Public => to_git(PUBLIC_GIT_PREFIX, rest),
             Scope::Private => to_git(PRIVATE_GIT_PREFIX, rest),
