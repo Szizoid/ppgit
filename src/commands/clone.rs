@@ -10,6 +10,8 @@ use crate::exec::{PRIVATE_GIT_ARG, WORK_TREE_ARG, io_checked, run_loud_checked, 
 use crate::gh::{
     PRIVATE_NAME_PREFIX, RepoIdentity, ensure_gh_ready, repo_exists, repo_identity, repo_url,
 };
+use crate::hooks::ensure_pre_push_hook;
+use crate::notes::ensure_fetch_refspec;
 use crate::ppgitignore::{PRIVATE_GIT_DIR, PUBLIC_GIT_DIR, sync_excludes};
 
 /// Works out the two repositories a ppgit project is made of, given either
@@ -21,7 +23,7 @@ use crate::ppgitignore::{PRIVATE_GIT_DIR, PUBLIC_GIT_DIR, sync_excludes};
 /// legitimately called `pp-something` is its own project's public half,
 /// not somebody's private half, and going by the name alone would send
 /// `clone` hunting for a `pp-pp-something` that was never meant to exist.
-fn halves(identity: &RepoIdentity) -> io::Result<(String, String)> {
+pub(crate) fn halves(identity: &RepoIdentity) -> io::Result<(String, String)> {
     let (owner, name) = identity.name_with_owner.rsplit_once('/').ok_or_else(|| {
         io::Error::other(format!(
             "gh returned a repository name without an owner: {}",
@@ -114,6 +116,9 @@ fn clone_private(url: &str) -> Result<(), ExitCode> {
             "+refs/heads/*:refs/remotes/origin/*",
         ],
     )?;
+    // Added, not set, so it doesn't disturb the branch refspec the call
+    // right above just configured.
+    ensure_fetch_refspec(&[PRIVATE_GIT_ARG])?;
     run_loud_checked("git", [PRIVATE_GIT_ARG, "fetch", "--quiet", "origin"])?;
 
     let branch = io_checked(
@@ -141,6 +146,29 @@ fn clone_private(url: &str) -> Result<(), ExitCode> {
         "git",
         [PRIVATE_GIT_ARG, WORK_TREE_ARG, "reset", "--quiet", "--hard"],
     )
+}
+
+/// A clone faithfully reproduces whatever the remotes held — including a
+/// superset invariant that was already broken *on the remotes*, which
+/// nothing about cloning can repair. Saying so right away beats letting
+/// the user discover it at the first `doctor`.
+fn warn_if_superset_broken() {
+    let Ok((absent, stale, _)) = crate::commands::doctor::superset_gaps() else {
+        return;
+    };
+    if absent.is_empty() && stale.is_empty() {
+        return;
+    }
+
+    eprintln!(
+        "ppgit: warning: the two halves were already out of step on the remotes:\n    \
+         {} public file(s) the private repository doesn't track,\n    \
+         {} at different content.",
+        absent.len(),
+        stale.len()
+    );
+    eprintln!("  `pp doctor` shows the details; `pp add . && pp commit` catches the");
+    eprintln!("  private half up.");
 }
 
 /// The two halves are cloned separately, each landing on whichever branch
@@ -223,14 +251,23 @@ fn try_clone(args: &[OsString]) -> Result<(), ExitCode> {
         "enter the cloned directory",
     )?;
 
+    // The clone above already fetched branches; the pairing-notes refspec
+    // still needs adding by hand, and a plain clone brings notes over no
+    // more than a bare one does, so a re-fetch pulls them in explicitly
+    // rather than waiting for whatever `fetch`/`pull` happens next.
+    ensure_fetch_refspec(&[])?;
+    run_loud_checked("git", ["fetch", "--quiet", "origin"])?;
+
     announce(PRIVATE_GIT_DIR);
     clone_private(&private_url)?;
 
     io_checked(sync_excludes(), "sync exclude files")?;
+    ensure_pre_push_hook()?;
     ensure_auto_upstream(&[])?;
     ensure_auto_upstream(&[PRIVATE_GIT_ARG])?;
 
     warn_if_branches_differ();
+    warn_if_superset_broken();
 
     println!(
         "ppgit: cloned {public} and {private} into {}",

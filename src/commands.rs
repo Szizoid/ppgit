@@ -1,9 +1,17 @@
 use std::process::ExitCode;
 
+pub mod checkout;
+pub mod cherry_pick;
 pub mod clone;
 pub mod commit;
 pub mod doctor;
 pub mod init;
+pub mod privatize;
+pub mod pull;
+pub mod push;
+pub mod rebase;
+pub mod reset;
+pub mod tree;
 
 pub fn cmd_help() -> ExitCode {
     println!(
@@ -20,6 +28,8 @@ ppgit's own commands:
 ppgit init                      set up both halves of a project here
 ppgit clone <repo> [<dir>]      set up both halves from GitHub
 ppgit doctor                    check the two halves are in step
+ppgit privatize <path>...       make paths private-only from now on
+ppgit publicize <path>...       stop treating paths as private
 
 {repo}",
         version = env!("CARGO_PKG_VERSION"),

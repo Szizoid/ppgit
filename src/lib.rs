@@ -1,7 +1,10 @@
 mod cli;
 mod commands;
+mod commits;
 mod exec;
 mod gh;
+mod hooks;
+mod notes;
 mod ppgitignore;
 
 use std::env;
@@ -10,7 +13,19 @@ use std::process::ExitCode;
 
 use cli::{Builtin, Scope, is_push, recognize, resolve_scope, split_scope};
 use commands::{
-    clone::cmd_clone, cmd_help, cmd_version, commit::cmd_commit, doctor::cmd_doctor, init::cmd_init,
+    checkout::cmd_checkout,
+    cherry_pick::cmd_cherry_pick,
+    clone::cmd_clone,
+    cmd_help, cmd_version,
+    commit::cmd_commit,
+    doctor::cmd_doctor,
+    init::cmd_init,
+    privatize::{cmd_privatize, cmd_publicize},
+    pull::cmd_pull,
+    push::cmd_push,
+    rebase::cmd_rebase,
+    reset::cmd_reset,
+    tree::{cmd_clean, cmd_stash},
 };
 use exec::{PRIVATE_GIT_PREFIX, PUBLIC_GIT_PREFIX, to_git};
 use ppgitignore::{
@@ -64,8 +79,22 @@ pub fn run() -> ExitCode {
         Some(Builtin::Version) => cmd_version(),
         Some(Builtin::Init) => cmd_init(),
         Some(Builtin::Clone) => cmd_clone(rest),
-        Some(Builtin::Commit) => cmd_commit(scope, rest),
+        Some(Builtin::Commit) => cmd_commit(rest),
         Some(Builtin::Doctor) => cmd_doctor(rest),
+        Some(Builtin::Privatize) => cmd_privatize(rest),
+        Some(Builtin::Publicize) => cmd_publicize(rest),
+        // These two get the raw flag rather than the resolved scope:
+        // their defaults differ from everything else's (private, not
+        // public), so they must be able to tell "defaulted" apart from
+        // "asked for".
+        Some(Builtin::Stash) => cmd_stash(explicit_scope, rest),
+        Some(Builtin::Clean) => cmd_clean(explicit_scope, rest),
+        Some(Builtin::Pull) => cmd_pull(explicit_scope, rest),
+        Some(Builtin::Push) => cmd_push(scope, rest),
+        Some(Builtin::Reset) => cmd_reset(explicit_scope, rest),
+        Some(Builtin::CherryPick) => cmd_cherry_pick(explicit_scope, rest),
+        Some(Builtin::Checkout) => cmd_checkout(scope, rest),
+        Some(Builtin::Rebase) => cmd_rebase(explicit_scope, rest),
         None => match scope {
             Scope::Public => to_git(PUBLIC_GIT_PREFIX, rest),
             Scope::Private => to_git(PRIVATE_GIT_PREFIX, rest),

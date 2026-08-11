@@ -13,7 +13,7 @@ const BLOCK_END: &str = "# <<< ppgit";
 
 /// Reads a file, treating "not there" as empty rather than an error — both
 /// `.ppgitignore` and an `info/exclude` are legitimately absent sometimes.
-fn read_or_empty(path: impl AsRef<Path>) -> io::Result<String> {
+pub fn read_or_empty(path: impl AsRef<Path>) -> io::Result<String> {
     match fs::read_to_string(path) {
         Ok(contents) => Ok(contents),
         Err(e) if e.kind() == ErrorKind::NotFound => Ok(String::new()),

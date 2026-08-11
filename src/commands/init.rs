@@ -5,6 +5,8 @@ use std::process::ExitCode;
 
 use crate::exec::{PRIVATE_GIT_ARG, WORK_TREE_ARG, io_checked, run_loud_checked, run_quiet_ok};
 use crate::gh::{PRIVATE_NAME_PREFIX, ensure_gh_ready, repo_create, repo_exists, repo_url};
+use crate::hooks::ensure_pre_push_hook;
+use crate::notes::ensure_fetch_refspec;
 use crate::ppgitignore::{PPGITIGNORE, PRIVATE_GIT_DIR, PUBLIC_GIT_DIR, sync_excludes};
 
 const PPGITIGNORE_TEMPLATE: &str = "# List the files or directories below that should be excluded from the\n\
@@ -113,6 +115,7 @@ fn try_init() -> Result<(), ExitCode> {
     io_checked(create_ppgitignore_template(), "create .ppgitignore")?;
     ensure_private_repo()?;
     io_checked(sync_excludes(), "sync exclude files")?;
+    ensure_pre_push_hook()?;
 
     ensure_auto_upstream(&[])?;
     ensure_auto_upstream(&[PRIVATE_GIT_ARG])?;
@@ -129,6 +132,11 @@ fn try_init() -> Result<(), ExitCode> {
 
     ensure_remote(&[], &public_url)?;
     ensure_remote(&[PRIVATE_GIT_ARG], &private_url)?;
+
+    // A plain `remote add` already sets up the branch refspec by itself;
+    // the pairing-notes one needs adding by hand.
+    ensure_fetch_refspec(&[])?;
+    ensure_fetch_refspec(&[PRIVATE_GIT_ARG])?;
 
     Ok(())
 }

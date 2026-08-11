@@ -5,17 +5,73 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use crate::exec::{PRIVATE_GIT_ARG, run_loud, run_quiet_stdout};
-use crate::gh::{repo_identity, repo_url};
+use crate::gh::{PRIVATE_NAME_PREFIX, repo_identity, repo_url};
+use crate::hooks::{HookState, install_pre_push_hook, pre_push_hook_state};
 use crate::ppgitignore::{PPGITIGNORE, PRIVATE_GIT_DIR, PUBLIC_GIT_DIR, tracked_but_ignored};
 
 /// How much a finding matters. Only `Problem` decides the exit code —
 /// `Note` is for what is perfectly normal to see (a commit waiting to be
 /// pushed, a check that needed the network and didn't get it) but still
-/// worth saying out loud.
+/// worth saying out loud. `Fixed` exists only under `--fix`: a problem
+/// that was just repaired.
 enum Level {
     Ok,
     Note,
     Problem,
+    Fixed,
+}
+
+/// What `--fix` may do about a finding. Everything here is a local
+/// change (config, index, a hook file) — that's the line `--fix` never
+/// crosses: anything needing a judgment call (a divergence, a broken
+/// superset) or touching a remote stays report-only.
+enum Action {
+    /// One git invocation, argv after `git` itself.
+    Git(Vec<String>),
+    /// (Re)install the pre-push hook — also repairs a lost executable
+    /// bit, since installing sets the mode.
+    InstallHook,
+}
+
+struct Fix {
+    action: Action,
+    /// What ppgit deliberately leaves to the user, e.g. the commit that
+    /// publishes a staged removal.
+    follow_up: Option<String>,
+}
+
+impl Fix {
+    fn git<const N: usize>(half: &Half, args: [&str; N]) -> Self {
+        let argv = half
+            .args
+            .iter()
+            .copied()
+            .chain(args)
+            .map(str::to_string)
+            .collect();
+        Self {
+            action: Action::Git(argv),
+            follow_up: None,
+        }
+    }
+
+    fn apply(&self) -> Result<Vec<String>, String> {
+        let mut ran = match &self.action {
+            Action::Git(argv) => {
+                let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+                run_quiet_stdout("git", &args).map_err(|e| e.to_string())?;
+                vec![format!("ran: git {}", argv.join(" "))]
+            }
+            Action::InstallHook => {
+                install_pre_push_hook().map_err(|e| e.to_string())?;
+                vec![format!("installed {PUBLIC_GIT_DIR}/hooks/pre-push")]
+            }
+        };
+        if let Some(follow_up) = &self.follow_up {
+            ran.push(follow_up.clone());
+        }
+        Ok(ran)
+    }
 }
 
 /// One line of the report, plus however many indented lines of
@@ -26,6 +82,7 @@ struct Finding {
     level: Level,
     headline: String,
     detail: Vec<String>,
+    fix: Option<Fix>,
 }
 
 impl Finding {
@@ -34,6 +91,7 @@ impl Finding {
             level: Level::Ok,
             headline: headline.into(),
             detail: Vec::new(),
+            fix: None,
         }
     }
 
@@ -42,6 +100,7 @@ impl Finding {
             level: Level::Note,
             headline: headline.into(),
             detail,
+            fix: None,
         }
     }
 
@@ -50,7 +109,13 @@ impl Finding {
             level: Level::Problem,
             headline: headline.into(),
             detail,
+            fix: None,
         }
+    }
+
+    fn fixable(mut self, fix: Fix) -> Self {
+        self.fix = Some(fix);
+        self
     }
 
     fn report(&self) {
@@ -58,6 +123,7 @@ impl Finding {
             Level::Ok => "ok",
             Level::Note => "note",
             Level::Problem => "PROBLEM",
+            Level::Fixed => "fixed",
         };
         println!("{tag:>8}  {}", self.headline);
         for line in &self.detail {
@@ -153,6 +219,43 @@ fn check_branches() -> Finding {
     }
 }
 
+/// The URL ppgit itself would configure as this half's origin — what a
+/// re-run of `init` would set. Derived through gh from the *other*
+/// half's origin when it has one (that survives the project directory
+/// being named anything); from the directory name, `init`'s own rule,
+/// otherwise.
+fn expected_origin_url(half: &Half) -> io::Result<String> {
+    let other = if half.git_dir == PUBLIC_GIT_DIR {
+        &PRIVATE
+    } else {
+        &PUBLIC
+    };
+
+    let name = match git_output(other, &["config", "--get", "remote.origin.url"]) {
+        Ok(url) => {
+            let (public, private) = crate::commands::clone::halves(&repo_identity(&url)?)?;
+            if half.git_dir == PUBLIC_GIT_DIR {
+                public
+            } else {
+                private
+            }
+        }
+        Err(_) => {
+            let cwd = std::env::current_dir()?;
+            let name = cwd
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| io::Error::other("no project name in the current directory"))?;
+            if half.git_dir == PUBLIC_GIT_DIR {
+                name.to_string()
+            } else {
+                format!("{PRIVATE_NAME_PREFIX}{name}")
+            }
+        }
+    };
+    repo_url(&name)
+}
+
 /// Checks that a half has an `origin` and that it points where ppgit
 /// itself would point it. The second half of that matters because
 /// `ensure_remote` leaves an existing `origin` alone whatever it holds —
@@ -160,7 +263,7 @@ fn check_branches() -> Finding {
 /// authenticates over HTTPS, failing every push.
 fn check_remote(half: &Half) -> Finding {
     let Ok(configured) = git_output(half, &["config", "--get", "remote.origin.url"]) else {
-        return Finding::problem(
+        let finding = Finding::problem(
             format!("{}: no origin configured", half.name),
             vec![
                 "Nothing to push to or pull from. `ppgit init` sets this, or add it".into(),
@@ -170,6 +273,12 @@ fn check_remote(half: &Half) -> Finding {
                 ),
             ],
         );
+        // Fixable only when gh can say what the URL should be — the
+        // repair itself is then a local `remote add`.
+        return match expected_origin_url(half) {
+            Ok(url) => finding.fixable(Fix::git(half, ["remote", "add", "origin", &url])),
+            Err(_) => finding,
+        };
     };
 
     // Ask gh what it would hand out for this same repository today. Two
@@ -194,7 +303,8 @@ fn check_remote(half: &Half) -> Finding {
                     half.git_dir
                 ),
             ],
-        ),
+        )
+        .fixable(Fix::git(half, ["remote", "set-url", "origin", &expected])),
         Err(_) => Finding::note(
             format!("{}: could not check origin against gh", half.name),
             vec![
@@ -227,6 +337,14 @@ fn check_fetch_refspec(half: &Half) -> Finding {
             ),
         ],
     )
+    .fixable(Fix::git(
+        half,
+        [
+            "config",
+            "remote.origin.fetch",
+            "+refs/heads/*:refs/remotes/origin/*",
+        ],
+    ))
 }
 
 /// How one half stands against its own remote. Being ahead or behind is
@@ -266,7 +384,15 @@ fn check_sync(half: &Half) -> Finding {
                     half.git_dir
                 ),
             ],
-        );
+        )
+        .fixable(Fix::git(
+            half,
+            [
+                "branch",
+                &format!("--set-upstream-to={remote_branch}"),
+                &branch,
+            ],
+        ));
     };
 
     let range = format!("{branch}...{upstream}");
@@ -328,18 +454,14 @@ fn tracked_blobs(half: &Half) -> io::Result<HashMap<String, String>> {
         .collect())
 }
 
-/// The invariant the whole design rests on: the private repository holds
-/// everything the public one does, plus the private files. It breaks
-/// quietly — a public-only change arriving by `pull` lands in `.git`
-/// alone, and the private half, which never saw that commit, is left
-/// behind without anything saying so.
-fn check_superset() -> Finding {
-    let (Ok(public), Ok(private)) = (tracked_blobs(&PUBLIC), tracked_blobs(&PRIVATE)) else {
-        return Finding::note(
-            "superset: could not compare the two halves".to_string(),
-            vec!["One of them has no commits yet.".into()],
-        );
-    };
+/// The superset comparison itself, shared with `clone` (which warns
+/// when the pair it just fetched was already out of step on the
+/// remotes): every publicly tracked path that the private HEAD lacks
+/// (`absent`) or holds at different content (`stale`), plus how many
+/// paths the public half tracks at all.
+pub(crate) fn superset_gaps() -> io::Result<(Vec<String>, Vec<String>, usize)> {
+    let public = tracked_blobs(&PUBLIC)?;
+    let private = tracked_blobs(&PRIVATE)?;
 
     let mut absent = Vec::new();
     let mut stale = Vec::new();
@@ -352,11 +474,25 @@ fn check_superset() -> Finding {
     }
     absent.sort();
     stale.sort();
+    Ok((absent, stale, public.len()))
+}
+
+/// The invariant the whole design rests on: the private repository holds
+/// everything the public one does, plus the private files. It breaks
+/// quietly — a public-only change arriving by `pull` lands in `.git`
+/// alone, and the private half, which never saw that commit, is left
+/// behind without anything saying so.
+fn check_superset() -> Finding {
+    let Ok((absent, stale, tracked)) = superset_gaps() else {
+        return Finding::note(
+            "superset: could not compare the two halves".to_string(),
+            vec!["One of them has no commits yet.".into()],
+        );
+    };
 
     if absent.is_empty() && stale.is_empty() {
         return Finding::ok(format!(
-            "superset: private holds all {} publicly tracked file(s)",
-            public.len()
+            "superset: private holds all {tracked} publicly tracked file(s)"
         ));
     }
 
@@ -415,10 +551,57 @@ fn check_tracked_but_ignored() -> Finding {
     );
     detail.push("then commit that removal to the public repository.".into());
 
+    let mut rm = vec!["rm", "-r", "--cached", "--ignore-unmatch", "--quiet", "--"];
+    rm.extend(conflicts.iter().map(String::as_str));
+    let argv = rm.into_iter().map(str::to_string).collect();
+
     Finding::problem(
         format!("{PPGITIGNORE}: private files are tracked publicly"),
         detail,
     )
+    .fixable(Fix {
+        action: Action::Git(argv),
+        // Deliberately not committed for the user: ppgit never commits
+        // on its own, and the message is theirs to write.
+        follow_up: Some("the removal is staged; publish it with: pp commit".into()),
+    })
+}
+
+/// The pre-push safety net only helps while it's actually in place —
+/// and git skipping a non-executable hook is silent, so that state is
+/// singled out rather than lumped in with "missing".
+fn check_pre_push_hook() -> Finding {
+    match pre_push_hook_state() {
+        HookState::Ours => Finding::ok("pre-push hook: installed"),
+        HookState::Missing => Finding::problem(
+            "pre-push hook: not installed",
+            vec![
+                "ppgit refuses to push while a private file is tracked publicly, but a".into(),
+                "raw `git push` never asks ppgit — the hook re-runs that check at the".into(),
+                "git level.".into(),
+                "Fix: re-run ppgit init (idempotent; installs the hook, changes nothing else)"
+                    .into(),
+            ],
+        )
+        .fixable(Fix {
+            action: Action::InstallHook,
+            follow_up: None,
+        }),
+        HookState::NotExecutable => Finding::problem(
+            "pre-push hook: present but not executable, so git silently skips it".to_string(),
+            vec![format!("Fix: chmod +x {PUBLIC_GIT_DIR}/hooks/pre-push")],
+        )
+        .fixable(Fix {
+            action: Action::InstallHook,
+            follow_up: None,
+        }),
+        HookState::Foreign => Finding::note(
+            "pre-push hook: exists but isn't ppgit's",
+            vec![
+                "Whether it guards against private files is unknown; ppgit leaves it alone.".into(),
+            ],
+        ),
+    }
 }
 
 fn check_layout() -> Finding {
@@ -437,11 +620,17 @@ fn check_layout() -> Finding {
 }
 
 pub fn cmd_doctor(args: &[OsString]) -> ExitCode {
-    if args.len() > 1 {
-        eprintln!("usage: ppgit doctor");
-        eprintln!("  Checks the two halves are in step. Takes no arguments.");
-        return ExitCode::FAILURE;
-    }
+    let fix_mode = match args {
+        [_] => false,
+        [_, flag] if flag.to_str() == Some("--fix") => true,
+        _ => {
+            eprintln!("usage: ppgit doctor [--fix]");
+            eprintln!("  Checks the two halves are in step. With --fix, repairs what has");
+            eprintln!("  exactly one right answer (config, index, the hook) and still only");
+            eprintln!("  reports what needs a judgment call.");
+            return ExitCode::FAILURE;
+        }
+    };
 
     if !Path::new(PRIVATE_GIT_DIR).is_dir() || !Path::new(PUBLIC_GIT_DIR).is_dir() {
         eprintln!(
@@ -464,34 +653,51 @@ pub fn cmd_doctor(args: &[OsString]) -> ExitCode {
     }
     findings.push(check_superset());
     findings.push(check_tracked_but_ignored());
+    findings.push(check_pre_push_hook());
+
+    if fix_mode {
+        for finding in &mut findings {
+            let Some(fix) = finding.fix.take() else {
+                continue;
+            };
+            if !matches!(finding.level, Level::Problem) {
+                continue;
+            }
+            match fix.apply() {
+                Ok(ran) => {
+                    finding.level = Level::Fixed;
+                    finding.detail = ran;
+                }
+                Err(e) => finding.detail.push(format!("--fix failed: {e}")),
+            }
+        }
+    }
 
     for finding in &findings {
         finding.report();
     }
 
-    let problems = findings
-        .iter()
-        .filter(|finding| matches!(finding.level, Level::Problem))
-        .count();
-    let notes = findings
-        .iter()
-        .filter(|finding| matches!(finding.level, Level::Note))
-        .count();
+    let count = |level: fn(&Level) -> bool| findings.iter().filter(|f| level(&f.level)).count();
+    let problems = count(|level| matches!(level, Level::Problem));
+    let notes = count(|level| matches!(level, Level::Note));
+    let fixed = count(|level| matches!(level, Level::Fixed));
 
     println!();
-    match (problems, notes) {
-        (0, 0) => {
-            println!("Everything checks out.");
-            ExitCode::SUCCESS
+    match (fixed, problems, notes) {
+        (0, 0, 0) => println!("Everything checks out."),
+        (0, 0, notes) => println!("No problems, {notes} note(s)."),
+        (0, problems, notes) => println!("{problems} problem(s), {notes} note(s)."),
+        (fixed, problems, notes) => {
+            println!("{fixed} fixed, {problems} problem(s) left, {notes} note(s).");
+            // The checks above ran before the repairs, so the report is
+            // one step behind its own fixes.
+            println!("Run ppgit doctor again to re-check.");
         }
-        (0, notes) => {
-            println!("No problems, {notes} note(s).");
-            ExitCode::SUCCESS
-        }
-        (problems, notes) => {
-            println!("{problems} problem(s), {notes} note(s).");
-            ExitCode::FAILURE
-        }
+    }
+    if problems == 0 {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
     }
 }
 
