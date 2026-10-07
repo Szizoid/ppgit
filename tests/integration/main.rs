@@ -14,6 +14,7 @@ mod doctor_fix;
 mod dual;
 mod hooks;
 mod init;
+mod mv;
 mod notes;
 mod private_message;
 mod privatize;

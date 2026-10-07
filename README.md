@@ -113,6 +113,13 @@ wrapper over `git`, plus a handful of its own commands:
   touch the working tree, rather than a second real checkout. Anything
   this doesn't specifically handle (`-b`, several arguments, a raw
   commit-ish) still passes through the plain double invocation.
+- `mv` runs on both by default, but not as two `git mv`s: `git mv` moves
+  the file on disk too, so the second one would find its source already
+  gone. The real `git mv` runs on the private half only; the public half
+  then gets the same rename in its index alone (`update-index`), for the
+  files it actually tracks — moving a directory with private files inside
+  stages only its public ones publicly. What's mirrored is checked against
+  what the private `git mv` really did, so `-n` and `-k` behave as usual.
 - `ppgit commit` opens the editor once, not once per repository: the
   private commit is made first, interactively, and its message is reused
   verbatim for the public one. With an explicit `-m` (or `-F`, `--fixup`,
@@ -418,6 +425,14 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
   Всё, что этот механизм не обрабатывает специально (`-b`, несколько
   аргументов, произвольный commit-ish), по-прежнему проходит через
   обычный двойной вызов.
+- `mv` по умолчанию идёт в оба, но не как два `git mv`: `git mv` двигает
+  файл и на диске, так что второй вызов уже не нашёл бы исходного файла.
+  Настоящий `git mv` выполняется только в приватной половине, а публичная
+  получает то же переименование только в индексе (`update-index`) — для
+  тех файлов, которые она действительно отслеживает: при перемещении
+  каталога с приватными файлами внутри публично индексируются только
+  публичные. Зеркалируется лишь то, что приватный `git mv` действительно
+  сделал, так что `-n` и `-k` работают как обычно.
 - `ppgit commit` открывает редактор один раз, а не по разу на
   репозиторий: сначала интерактивно делается приватный коммит, затем его
   сообщение дословно переиспользуется для публичного. Если сообщение

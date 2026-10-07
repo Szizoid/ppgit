@@ -20,6 +20,7 @@ use commands::{
     commit::cmd_commit,
     doctor::cmd_doctor,
     init::cmd_init,
+    mv::cmd_mv,
     privatize::{cmd_privatize, cmd_publicize},
     pull::cmd_pull,
     push::cmd_push,
@@ -95,6 +96,7 @@ pub fn run() -> ExitCode {
         Some(Builtin::CherryPick) => cmd_cherry_pick(explicit_scope, rest),
         Some(Builtin::Checkout) => cmd_checkout(scope, rest),
         Some(Builtin::Rebase) => cmd_rebase(explicit_scope, rest),
+        Some(Builtin::Mv) => cmd_mv(scope, rest),
         None => match scope {
             Scope::Public => to_git(PUBLIC_GIT_PREFIX, rest),
             Scope::Private => to_git(PRIVATE_GIT_PREFIX, rest),

@@ -21,6 +21,7 @@ pub enum Builtin {
     CherryPick,
     Checkout,
     Rebase,
+    Mv,
 }
 
 pub fn recognize(args: &[OsString]) -> Option<Builtin> {
@@ -68,6 +69,11 @@ pub fn recognize(args: &[OsString]) -> Option<Builtin> {
         // Same routing as `reset`/`cherry-pick`, but for a whole range —
         // see `commands::rebase`.
         Some("rebase") => Some(Builtin::Rebase),
+        // Moves the file on disk as well as in the index, so the second
+        // half's `git mv` finds its source already gone. Still in
+        // `DUAL_BY_DEFAULT` below — this only changes how the Both case
+        // runs. See `commands::mv`.
+        Some("mv") => Some(Builtin::Mv),
         _ => None,
     }
 }

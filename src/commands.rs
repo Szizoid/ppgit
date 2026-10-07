@@ -6,6 +6,7 @@ pub mod clone;
 pub mod commit;
 pub mod doctor;
 pub mod init;
+pub mod mv;
 pub mod privatize;
 pub mod pull;
 pub mod push;
