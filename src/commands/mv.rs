@@ -50,14 +50,42 @@ use crate::ppgitignore::{
 };
 
 pub fn cmd_mv(scope: Scope, args: &[OsString]) -> ExitCode {
+    let project = Path::new(PRIVATE_GIT_DIR).is_dir();
+    // In any scope: `--private mv` would move the list just the same.
+    if project && touches_list(args) {
+        eprintln!("ppgit: refusing to move {PPGITIGNORE}, or anything onto it");
+        eprintln!(
+            "  The exclude rules are regenerated from it on every run, so without it\n  \
+             in place every private file would be visible to the public half at once."
+        );
+        return ExitCode::FAILURE;
+    }
     match scope {
         Scope::Public => to_git(PUBLIC_GIT_PREFIX, args),
         Scope::Private => to_git(PRIVATE_GIT_PREFIX, args),
-        Scope::Both if !Path::new(PRIVATE_GIT_DIR).is_dir() => to_git(PUBLIC_GIT_PREFIX, args),
+        Scope::Both if !project => to_git(PUBLIC_GIT_PREFIX, args),
         Scope::Both => match try_mv(args) {
             Ok(code) | Err(code) => code,
         },
     }
+}
+
+/// Whether the move would take `.ppgitignore` away or land something on
+/// it. Any argument naming it counts, option or not — refusing a
+/// directory named that by mistake costs nothing; the other way round
+/// costs every private file.
+fn touches_list(args: &[OsString]) -> bool {
+    let named = args[1..].iter().any(|arg| {
+        arg.to_str()
+            .is_some_and(|arg| normalise(arg) == PPGITIGNORE)
+    });
+    named
+        || paths(args).is_some_and(|paths| match paths.split_last() {
+            Some((destination, sources)) => targets(sources, destination)
+                .iter()
+                .any(|root| root.to == PPGITIGNORE),
+            None => false,
+        })
 }
 
 fn try_mv(args: &[OsString]) -> Result<ExitCode, ExitCode> {

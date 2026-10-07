@@ -241,6 +241,30 @@ fn mv_dry_run_moves_nothing_in_either_half() {
 }
 
 #[test]
+fn mv_refuses_to_move_the_list_or_onto_it() {
+    let env = TestEnv::new();
+    let project = pair(&env);
+    project.write("sub/.ppgitignore", "decoy\n");
+    project.commit_all("second");
+    let list = project.read(".ppgitignore");
+
+    for args in [
+        &["mv", ".ppgitignore", "list.txt"][..],
+        &["--private", "mv", "./.ppgitignore", "list.txt"],
+        &["mv", "-f", "a.txt", ".ppgitignore"],
+        &["mv", "-f", "sub/.ppgitignore", "."],
+    ] {
+        let output = project.pp(args);
+        crate::harness::assert_failure(&output, &format!("pp {}", args.join(" ")));
+        assert!(stderr(&output).contains("refusing to move .ppgitignore"));
+    }
+
+    assert_eq!(project.read(".ppgitignore"), list);
+    assert_eq!(project.read("a.txt"), "a\n");
+    assert_eq!(staged_private(&project), "");
+}
+
+#[test]
 fn a_failed_private_mv_stops_before_the_public_half() {
     let env = TestEnv::new();
     let project = pair(&env);

@@ -127,6 +127,8 @@ wrapper over `git`, plus a handful of its own commands:
   glob) is left alone, since the move may be meant to publish the file —
   but a private file that ends up visible to the public half is warned
   about. A public file moved onto a private path is untracked publicly.
+  Moving `.ppgitignore` itself, or anything onto it, is refused in any
+  scope: the exclude rules are generated from it on every run.
 - `ppgit commit` opens the editor once, not once per repository: the
   private commit is made first, interactively, and its message is reused
   verbatim for the public one. With an explicit `-m` (or `-F`, `--fixup`,
@@ -448,7 +450,9 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
   возможно, перемещение затем и сделано, чтобы опубликовать файл, — но
   если приватный файл становится виден публичной половине, ppgit
   предупреждает. Публичный файл, перемещённый на приватный путь,
-  перестаёт отслеживаться публично.
+  перестаёт отслеживаться публично. Перемещение самого `.ppgitignore`
+  (или чего-либо поверх него) отклоняется при любом scope: exclude-правила
+  генерируются из него при каждом запуске.
 - `ppgit commit` открывает редактор один раз, а не по разу на
   репозиторий: сначала интерактивно делается приватный коммит, затем его
   сообщение дословно переиспользуется для публичного. Если сообщение
