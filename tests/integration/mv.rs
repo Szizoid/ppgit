@@ -1,4 +1,4 @@
-use crate::harness::{Project, TestEnv, stderr};
+use crate::harness::{Project, TestEnv, stderr, stdout};
 
 /// A pair with a public file, a public directory and a private-only file
 /// inside it, all committed.
@@ -67,7 +67,7 @@ fn mv_of_a_directory_leaves_its_private_files_out_of_the_public_half() {
 
     assert_eq!(
         staged_private(&project),
-        "R100\td/secret.txt\te/secret.txt\nR100\td/x.txt\te/x.txt"
+        "M\t.ppgitignore\nR100\td/secret.txt\te/secret.txt\nR100\td/x.txt\te/x.txt"
     );
     assert_eq!(staged_public(&project), "R100\td/x.txt\te/x.txt");
     assert!(
@@ -83,14 +83,123 @@ fn mv_of_a_private_only_file_leaves_the_public_half_alone() {
     let env = TestEnv::new();
     let project = pair(&env);
 
-    project.pp_ok(&["mv", "secret.txt", "d/secret2.txt"]);
+    project.write("e/e.txt", "e\n");
+    project.commit_all("second");
 
-    assert_eq!(staged_private(&project), "R100\tsecret.txt\td/secret2.txt");
+    // Listed by bare name, which matches at any depth: still private
+    // after the move, so there's nothing to rewrite or warn about.
+    let output = project.pp_ok(&["mv", "secret.txt", "e/secret.txt"]);
+    assert!(!stderr(&output).contains("warning"));
+
+    assert_eq!(staged_private(&project), "R100\tsecret.txt\te/secret.txt");
     assert_eq!(staged_public(&project), "");
     assert!(
         !project
             .tracked_public()
-            .contains(&"d/secret2.txt".to_string())
+            .contains(&"e/secret.txt".to_string())
+    );
+    assert!(public_excludes(&project, "e/secret.txt"));
+}
+
+fn public_excludes(project: &Project, path: &str) -> bool {
+    project
+        .git(&["check-ignore", "--no-index", "-q", path])
+        .status
+        .success()
+}
+
+#[test]
+fn mv_rewrites_an_exact_ppgitignore_line_and_stages_it() {
+    let env = TestEnv::new();
+    let project = pair(&env);
+
+    let output = project.pp_ok(&["mv", "d/secret.txt", "d/renamed.txt"]);
+    assert!(stdout(&output).contains("d/secret.txt → d/renamed.txt"));
+
+    let list = project.read(".ppgitignore");
+    assert!(list.lines().any(|line| line == "d/renamed.txt"));
+    assert!(!list.lines().any(|line| line == "d/secret.txt"));
+    assert!(public_excludes(&project, "d/renamed.txt"));
+    assert_eq!(
+        staged_private(&project),
+        "M\t.ppgitignore\nR100\td/secret.txt\td/renamed.txt"
+    );
+    assert_eq!(staged_public(&project), "");
+}
+
+#[test]
+fn mv_keeps_the_form_of_a_rewritten_directory_line() {
+    let env = TestEnv::new();
+    let project = pair(&env);
+    project.append(".ppgitignore", "/vault/\n");
+    project.write("vault/key.txt", "k\n");
+    project.commit_all("second");
+
+    project.pp_ok(&["mv", "vault", "safe"]);
+
+    assert!(
+        project
+            .read(".ppgitignore")
+            .lines()
+            .any(|line| line == "/safe/")
+    );
+    assert!(public_excludes(&project, "safe/key.txt"));
+    assert!(
+        !project
+            .tracked_public()
+            .contains(&"safe/key.txt".to_string())
+    );
+}
+
+#[test]
+fn mv_warns_when_a_private_file_leaves_its_pattern() {
+    let env = TestEnv::new();
+    let project = pair(&env);
+    project.append(".ppgitignore", "*.pdf\n");
+    project.write("a.pdf", "pdf\n");
+    project.commit_all("second");
+    let list = project.read(".ppgitignore");
+
+    // Renamed away from a bare-name line, and out of a glob: neither is
+    // rewritten — the move may be meant to publish the file — but both
+    // are pointed out, since the next `pp add` would.
+    let output = project.pp_ok(&["mv", "secret.txt", "renamed.txt"]);
+    assert!(stderr(&output).contains("secret.txt → renamed.txt  (was private through secret.txt)"));
+    let output = project.pp_ok(&["mv", "a.pdf", "a.md"]);
+    assert!(stderr(&output).contains("a.pdf → a.md  (was private through *.pdf)"));
+
+    assert_eq!(project.read(".ppgitignore"), list);
+    assert_eq!(staged_public(&project), "");
+
+    // Still matching the glob: no warning.
+    project.write("b.pdf", "pdf\n");
+    project.commit_all("third");
+    let output = project.pp_ok(&["mv", "b.pdf", "c.pdf"]);
+    assert!(!stderr(&output).contains("warning"));
+}
+
+#[test]
+fn mv_onto_a_private_path_untracks_the_file_publicly() {
+    let env = TestEnv::new();
+    let project = pair(&env);
+    project.append(".ppgitignore", "/vault/\n");
+    project.write("vault/key.txt", "k\n");
+    project.commit_all("second");
+
+    let output = project.pp_ok(&["mv", "a.txt", "vault"]);
+    assert!(stdout(&output).contains("a.txt → vault/a.txt  (/vault/)"));
+
+    assert_eq!(staged_private(&project), "R100\ta.txt\tvault/a.txt");
+    assert_eq!(staged_public(&project), "D\ta.txt");
+    assert!(
+        !project
+            .tracked_public()
+            .contains(&"vault/a.txt".to_string())
+    );
+    // Nothing tracked-but-ignored left behind for the push gate to trip on.
+    assert_eq!(
+        project.git_stdout(&["ls-files", "-i", "-c", "--exclude-standard"]),
+        ""
     );
 }
 

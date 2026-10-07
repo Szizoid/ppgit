@@ -45,7 +45,7 @@ where
 /// anything that might read from the terminal or prompt for input. Use
 /// `run_quiet_ok`/`run_quiet_stdout` below unless you need the full
 /// `Output` (exit status *and* stdout *and* stderr) yourself.
-fn run_quiet(program: &str, args: &[&str]) -> io::Result<Output> {
+pub fn run_quiet(program: &str, args: &[&str]) -> io::Result<Output> {
     Command::new(program).args(args).output()
 }
 

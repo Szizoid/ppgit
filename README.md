@@ -120,6 +120,13 @@ wrapper over `git`, plus a handful of its own commands:
   files it actually tracks — moving a directory with private files inside
   stages only its public ones publicly. What's mirrored is checked against
   what the private `git mv` really did, so `-n` and `-k` behave as usual.
+  `.ppgitignore` follows the move where that's unambiguous: a line naming
+  exactly a moved path (`docs/report.pdf`, `/vault/` — anchored, no
+  globs) is rewritten to the new path and staged privately with the
+  rename. Anything less exact (a bare name, a directory the file left, a
+  glob) is left alone, since the move may be meant to publish the file —
+  but a private file that ends up visible to the public half is warned
+  about. A public file moved onto a private path is untracked publicly.
 - `ppgit commit` opens the editor once, not once per repository: the
   private commit is made first, interactively, and its message is reused
   verbatim for the public one. With an explicit `-m` (or `-F`, `--fixup`,
@@ -432,7 +439,16 @@ GPL-3.0-or-later, see [LICENSE](LICENSE).
   тех файлов, которые она действительно отслеживает: при перемещении
   каталога с приватными файлами внутри публично индексируются только
   публичные. Зеркалируется лишь то, что приватный `git mv` действительно
-  сделал, так что `-n` и `-k` работают как обычно.
+  сделал, так что `-n` и `-k` работают как обычно. `.ppgitignore`
+  следует за перемещением там, где это однозначно: строка, называющая
+  ровно перемещённый путь (`docs/report.pdf`, `/vault/` — привязанная к
+  корню, без glob-шаблонов), переписывается на новый путь и стейджится в
+  приватной половине вместе с переименованием. Всё менее точное (голое
+  имя, каталог, из которого файл ушёл, glob) остаётся как есть —
+  возможно, перемещение затем и сделано, чтобы опубликовать файл, — но
+  если приватный файл становится виден публичной половине, ppgit
+  предупреждает. Публичный файл, перемещённый на приватный путь,
+  перестаёт отслеживаться публично.
 - `ppgit commit` открывает редактор один раз, а не по разу на
   репозиторий: сначала интерактивно делается приватный коммит, затем его
   сообщение дословно переиспользуется для публичного. Если сообщение
